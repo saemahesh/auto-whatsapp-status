@@ -1,0 +1,375 @@
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lw-app-bg-color: #1E1E25;
+    --lw-white-color: #fff;
+    --lw-dark-blue-color: #15151a;
+    --lw-primary-color: #2bac32;
+    --lw-black-color: #000;
+    --lw-border-color:#282c31;
+    --lw-dark-brown-color: #1E1E25;
+    --lw-blue-color:#3F51B5;
+  }
+  html > body {
+    background: var(--lw-app-bg-color) url("../../imgs/wa-message-bg-dark.png") repeat !important;
+    color: #d1d1d1;
+    color-scheme: dark;
+  }
+  .btn.btn-primary, .bg-primary, .bg-success, .conversation-compose .send .circle, .page-item.active .page-link, .btn-success, .btn.btn-light.lw-save-language {
+    color: var(--lw-white-color) !important;
+    border-color: var(--lw-primary-color) !important;
+    background-color: var(--lw-primary-color) !important;
+  }
+  .text-success, .text-primary, .text-green {
+    color: var(--lw-primary-color) !important;
+  }
+  a {
+    color: var(--lw-primary-color);
+  }
+  table.dataTable.dtr-inline.collapsed > tbody > tr > td:first-child:before {
+    background-color: var(--lw-primary-color) !important;
+  }
+  .input-group-append .btn.btn-outline-success {
+    color: var(--lw-white-color) !important;
+    border: 1px solid var(--lw-primary-color) !important;
+    background: var(--lw-primary-color) !important;
+  }
+  .card.lw-whatsapp-chat-block-container .nav-tabs {
+    border-color: 1px solid var(--lw-primary-color) !important;
+  }
+  .card, .main-content .navbar-top, .bg-gradient-default, .card-header, fieldset {
+    background: var(--lw-dark-blue-color) !important;
+    border: 0;
+    box-shadow: 0 1px 20px 0 rgba(0, 0, 0, 0.1) !important;
+  }
+  .card .text-muted.text-sm, .main-content .navbar-top .text-muted.text-sm, .bg-gradient-default .text-muted.text-sm, .card-header .text-muted.text-sm, fieldset .text-muted.text-sm {
+    font-size: 16px !important;
+    font-weight: 600;
+  }
+  .h1, .h2, .h3, .h4, .h5, .h6, h1, h2, h3, h4, h5, h6 {
+    color: var(--lw-white-color) !important;
+  }
+  .text-muted {
+    color: #c3c3c3 !important;
+    text-transform: capitalize !important;
+  }
+  .bg-white,
+  .navbar-collapse.show {
+    background-color: var(--lw-dark-blue-color) !important;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--lw-dark-blue-color);
+  }
+  .navbar-light .navbar-nav .nav-link, .nav-link .text-dark {
+    color: #c3c3c3 !important;
+  }
+  .navbar-light .navbar-nav .nav-link:hover, .nav-link .text-dark:hover {
+    color: var(--lw-white-color) !important;
+  }
+  .table td, .table th {
+    border-color: var(--lw-border-color);
+  }
+  .thead-light th {
+    background: var(--lw-dark-blue-color) !important;
+    border-color: var(--lw-border-color) !important;
+    color: var(--lw-white-color) !important;
+  }
+  div.dataTables_wrapper table.dataTable > tbody > tr:hover {
+    background-color: var(--lw-app-bg-color);
+  }
+  .btn.btn-light, .swal2-cancel.swal2-styled {
+    background-color: var(--lw-black-color) !important;
+    border-color: var(--lw-black-color) !important;
+    color: #fff !important;
+  }
+  .btn.btn-light:hover, .swal2-cancel.swal2-styled:hover {
+    background-color: var(--lw-black-color) !important;
+  }
+  .text-dark, .text-blue, .lw-details-item, .swal2-html-container {
+    color: var(--lw-white-color) !important;
+  }
+  fieldset, .card-body.card-deck .card {
+    border: 1px solid var(--lw-border-color) !important;
+  }
+  fieldset legend, .btn-group .btn.btn-black.dropdown-toggle, .btn.btn-secondary {
+    color: var(--lw-white-color);
+    background-color: var(--lw-dark-brown-color) !important;
+    border: 1px solid var(--lw-border-color) !important;
+  }
+  fieldset legend .text-muted, .btn-group .btn.btn-black.dropdown-toggle .text-muted, .btn.btn-secondary .text-muted {
+    color: #aba1a1 !important;
+  }
+  legend {
+    cursor: pointer;
+  }
+  legend img {
+    background-color: var(--lw-white-color);
+  }
+  label h3 img {
+    background-color: var(--lw-white-color);
+  }
+  .modal-content, .modal .modal-body, .modal-open .modal.lw-has-form .modal-footer, .selectize-dropdown {
+    background-color: var(--lw-dark-blue-color);
+  }
+  .modal-content .selectize-dropdown-content, .modal .modal-body .selectize-dropdown-content, .modal-open .modal.lw-has-form .modal-footer .selectize-dropdown-content, .selectize-dropdown .selectize-dropdown-content {
+    color: var(--lw-white-color);
+    cursor: pointer;
+  }
+  .modal-content .modal-header {
+    border-bottom: 1px solid var(--lw-border-color);
+  }
+  .modal-open .modal.lw-has-form .modal-footer, hr {
+    border-top: 1px solid var(--lw-border-color);
+  }
+  .card-header:first-child {
+    cursor: pointer;
+  }
+  .form-control, .selectize-input.full, .selectize-input, .selectize-control.single .selectize-input.input-active {
+    color: #cfcfcf !important;
+    background-color: var(--lw-dark-brown-color) !important;
+    border: 1px solid var(--lw-border-color) !important;
+  }
+  .selectize-input.full, .selectize-input {
+    border: none !important;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .conversation-compose > div,
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .conversation-compose .emojionearea .emojionearea-editor {
+    background-color: #2a3942 !important;
+    color: #cfcfcf;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .conversation-compose .photo:after {
+    border-color: transparent transparent transparent #2a3942;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .conversation-compose .emoji {
+    background-color: #2a3942 !important;
+  }
+  .input-group-text {
+    background-color: var(--lw-black-color);
+    border: 0;
+    margin-left: 1px;
+  }
+  .card-body.card-deck .card {
+    border: 1px solid var(--lw-border-color) !important;
+    padding: 0;
+  }
+  .card-body.card-deck .card .card-footer {
+    background-color: var(--lw-dark-blue-color);
+  }
+  .form-control-label {
+    color: #cfcfcf;
+  }
+  .navbar-light .navbar-nav .active > .nav-link,
+  .navbar-light .navbar-nav .nav-link:hover, .navbar-light .navbar-nav .nav-link.active,
+  .active > .navbar-light .navbar-nav .nav-link {
+    color: var(--lw-white-color) !important;
+    background: var(--lw-black-color);
+    border-left: 2px solid var(--lw-white-color);
+  }
+  .navbar-vertical.navbar-expand-md .navbar-nav .nav-link.active:before {
+    border: none !important;
+  }
+  .navbar-nav .nav-item .nav-link {
+    border-left: 2px solid var(--lw-dark-blue-color);
+  }
+  .lw-form-card-box .input-group.input-group-alternative {
+    border: none;
+  }
+  .lw-form-card-box .form-control {
+    border-radius: 0 !important;
+  }
+  .lw-form-card-box .card-footer {
+    background-color: var(--lw-dark-blue-color);
+  }
+  .lw-guest-page .navbar-horizontal .navbar-nav .nav-link {
+    color: var(--lw-white-color);
+  }
+  .lw-guest-page .lw-page-dropdown button {
+    background: transparent;
+  }
+  div:where(.swal2-container) div:where(.swal2-popup) {
+    background: var(--lw-dark-blue-color);
+  }
+  .nav-tabs .nav-link {
+    background-color: #373636;
+    color: var(--lw-white-color);
+  }
+  .nav-tabs .nav-link.active {
+    background-color: var(--lw-primary-color) !important;
+    color: var(--lw-white-color);
+  }
+  .selectize-dropdown .active, .selectize-dropdown .optgroup-header {
+    background-color: var(--lw-dark-brown-color);
+    color: var(--lw-white-color);
+  }
+  .btn-default {
+    background-color: #3f4045 !important;
+    border-color: #3f4045 !important;
+    color: var(--lw-white-color) !important;
+  }
+  .flowchart-operator {
+    background: #131318 !important;
+    color: var(--lw-black-color);
+    border-color: var(--lw-border-color) !important;
+    border-radius: 6px;
+  }
+  .flowchart-operator .flowchart-operator-title {
+    font-weight: 400 !important;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom: 1px solid var(--lw-border-color) !important;
+    color: var(--lw-white-color);
+    background: var(--lw-black-color) !important;
+  }
+  .flowchart-operator .flowchart-operator-inputs-outputs {
+    color: #cfcfcf;
+    font-weight: 500;
+  }
+  dd .lw-btn.btn.btn-sm.btn-outline-default {
+    background-color: var(--lw-border-color);
+    border-color: var(--lw-border-color);
+    color: var(--lw-white-color);
+  }
+  .badge-success {
+    background-color: var(--lw-primary-color);
+    color: var(--lw-white-color);
+  }
+  fieldset pre {
+    color: var(--lw-white-color);
+  }
+  .list-group-item {
+    background-color: var(--lw-dark-blue-color) !important;
+    border: 0;
+    border-bottom: 1px solid var(--lw-border-color) !important;
+    border-radius: 0;
+  }
+  .list-group-item:hover, .list-group-item:focus {
+    background-color: var(--lw-black-color) !important;
+  }
+  .card.lw-whatsapp-chat-block-container .selectize-control.multi .selectize-input > div {
+    border: 0;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .lw-contact-list .lw-contact {
+    border-radius: 0;
+    border-top: 1px solid var(--lw-border-color) !important;
+    border-bottom: none !important;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .conversation {
+    background: var(--lw-black-color) url("../../imgs/wa-message-bg-dark.png") repeat !important;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .message {
+    color: var(--lw-white-color);
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .message.sent {
+    background-color: #1f4f3a;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .message.sent:after {
+    border-color: transparent transparent transparent #1f4f3a;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .message.received {
+    background: #222c32;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .message.received:after {
+    border-color: transparent #222c32 transparent transparent;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .metadata .time {
+    color: #b3b3b3;
+  }
+  .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .user-bar {
+    background: #0b1014;
+    border-bottom: 1px solid #4b4b4b;
+  }
+  .card.lw-whatsapp-chat-block-container .nav-tabs .nav-link {
+    background-color: var(--lw-dark-blue-color);
+    color: var(--lw-white-color);
+  }
+  .card.lw-whatsapp-chat-block-container .shadow-lg {
+    box-shadow: none !important;
+  }
+  .lw-whatsapp-preview-message-container .lw-whatsapp-preview .card {
+    background-color: #1f4f3a !important;
+    color: #bfbfbf;
+    box-shadow: none !important;
+  }
+  .lw-whatsapp-preview-message-container .lw-whatsapp-preview .card .card-footer {
+    border-top: 0;
+  }
+  .lw-whatsapp-preview-message-container .lw-whatsapp-preview .card .card-footer .lw-whatsapp-buttons .list-group-item {
+    background-color: #1f4f3a !important;
+    border-bottom: 1px solid var(--lw-border-color) !important;
+  }
+  .lw-whatsapp-preview-message-container .lw-whatsapp-preview .card .card-footer .list-group-item {
+    border-top: 1px solid var(--lw-border-color);
+  }
+  .lw-whatsapp-preview > .card::after {
+    border-color: transparent var(--lw-dark-blue-color) transparent transparent;
+  }
+  .btn.btn-danger {
+    color: var(--lw-white-color) !important;
+    background-color: #c11616 !important;
+    border: 1px solid #c11616 !important;
+  }
+  .btn.btn-info {
+    color: var(--lw-white-color) !important;
+  }
+  .dropdown-menu {
+    background-color: var(--lw-dark-brown-color) !important;
+    color: var(--lw-white-color) !important;
+    box-shadow: 0 19px 38px rgba(0, 0, 0, 0.3), 0 15px 12px rgba(0, 0, 0, 0.22) !important;
+  }
+  .dropdown-item {
+    color: var(--lw-white-color) !important;
+  }
+  .dropdown-item:hover, .dropdown-item::before {
+    background-color: var(--lw-dark-blue-color);
+  }
+  .navbar .dropdown-menu-arrow:before {
+    background-color: var(--lw-dark-brown-color);
+  }
+  .alert-light {
+    background-color: var(--lw-black-color) !important;
+    border: 1px solid var(--lw-border-color);
+  }
+  .alert-warning, .alert-danger, .alert-default {
+    border-color: var(--lw-blue-color) !important;
+    background-color: var(--lw-blue-color) !important;
+  }
+  .page-link, .page-item.disabled .page-link {
+    background-color: var(--lw-dark-brown-color) !important;
+    border: 1px solid var(--lw-border-color) !important;
+  }
+  .form-group .input-group.input-group-alternative {
+    border: none !important;
+  }
+  .btn-warning, .badge.badge-warning {
+    border-color: #bb9018 !important;
+    background-color: #bb9018 !important;
+    color: var(--lw-white-color) !important;
+  }
+  .badge.bg-yellow {
+    background-color: var(--lw-white-color) !important;
+    color: var(--lw-black-color) !important;
+  }
+  .lw-breadcrumb-container {
+    background-color: var(--lw-dark-blue-color) !important;
+  }
+  .close > span:not(.sr-only) {
+    color: var(--lw-white-color);
+  }
+  .input-group-append .btn.btn-outline-light {
+    background: var(--lw-dark-brown-color) !important;
+    color: var(--lw-white-color) !important;
+    border: 1px solid var(--lw-border-color) !important;
+  }
+  .dataTables_wrapper .dataTables_length select {
+    background-color: var(--lw-dark-blue-color);
+    color: #6f6f6f;
+  }
+}
+.badge.badge-danger {
+  background-color: #f5365c !important;
+  color: var(--lw-white-color);
+}
+
+.btn-dark {
+  background-color: var(--lw-black-color) !important;
+  border: 1px solid var(--lw-black-color);
+}
