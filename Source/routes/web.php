@@ -1347,12 +1347,43 @@ Route::get('/custom-styles.css', [
     'customStyles'
 ])->name('app.load_custom_style');
 
-// whatsapp webhook
+// whatsapp webhook - WITH NODE.JS INTEGRATION AND PHP FALLBACK
 // DO NOT CHANGE THE PATH as it described in CSRF protection
-Route::any('whatsapp-webhook/{vendorUid}', [
-    WhatsAppServiceController::class,
-    'webhook',
-])->name('vendor.whatsapp_webhook');
+Route::any('whatsapp-webhook/{vendorUid}', function ($vendorUid, Request $request) {
+    $nodeJsUrl = config('services.nodejs.url', 'http://localhost:3000');
+    $nodeJsEnabled = config('services.nodejs.enabled', false);
+    
+    // If Node.js is disabled, use original PHP processing
+    if (!$nodeJsEnabled) {
+        return app(WhatsAppServiceController::class)->webhook($request, $vendorUid);
+    }
+    
+    // Handle GET request (webhook verification from WhatsApp)
+    if ($request->isMethod('GET')) {
+        try {
+            $response = Http::timeout(5)->get("{$nodeJsUrl}/webhook/{$vendorUid}", $request->all());
+            return response($response->body(), $response->status());
+        } catch (\Exception $e) {
+            \Log::error('Webhook verification via Node.js failed, falling back to PHP:', ['error' => $e->getMessage()]);
+            // Fallback to PHP processing
+            return app(WhatsAppServiceController::class)->webhook($request, $vendorUid);
+        }
+    }
+    
+    // Handle POST request (webhook from WhatsApp)
+    // Return 200 immediately and forward to Node.js asynchronously
+    try {
+        Http::async()->timeout(5)->post("{$nodeJsUrl}/webhook/{$vendorUid}", $request->all());
+    } catch (\Exception $e) {
+        \Log::warning('Webhook forwarding to Node.js failed, falling back to PHP:', ['error' => $e->getMessage()]);
+        // Fallback to PHP processing asynchronously
+        dispatch(function() use ($request, $vendorUid) {
+            app(WhatsAppServiceController::class)->webhook($request, $vendorUid);
+        })->afterResponse();
+    }
+    
+    return response('OK', 200);
+})->name('vendor.whatsapp_webhook');
 
 // for cron job to run schedule
 Route::get('/run-cron-schedule/{token?}', [

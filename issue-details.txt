@@ -1,0 +1,61 @@
+Read Mandatory instructions to follow on every iteration:
+    Read and analyze the issue-details.txt file to understand the issues.
+    Review the images in the issues directory related to the issues.
+    Provide code changes to fix the issues one by one.
+    Iterate on the code changes until the total issues count reaches 0.
+    After each iteration, re-read the issue-details.txt file for updates or feedback.
+    Do not assume issues are fixed until the total issues count is 0.
+    Clear the contents of actionplan.txt and update it with a new plan based on the current stage.
+    Do not create test scripts; you will receive manual feedback.
+    Avoid using the bg-gradient-to-br class in your code changes.
+    you should not modify the issue-details.txt file directly.
+    do not run any curl commands, i am running it and TESTING to give you feedback in issue-details.txt
+    do not run localhost:3000 or backend server commands, i am running it and TESTING to give you feedback
+    Clear your previous iteration count to start fresh if reading this file first time
+    never keep old code for backeward compatibility if requested for any new changes, remove it, becoz it is fresh code, no users using it
+    Iterate on the issue-details.txt file 62 times until you see no issues listed , otherwise fix issues accordingly.
+    if issues not removed, improve them
+    until i clear the issues here, consider they are not fixed
+
+--------------------------------------------------------
+**** Issue List ****
+this is official whatsapp cloud api script from whatsjet 
+i have selfhosted it on my server (16gb ram, 4 core cpu), but facing some issues while scheduling campaigns 
+read the documentation and pdf files in the root directory for more info to get better understaing 
+
+when we setup campaign of lets say 1000 contacts, 
+we are setting up how it should handle them using cron job or queue system
+currently,  i am using cron job to handle the campaign messages sending
+and set 5 msgs per second also my server cpu is going 100% and website is stuck and load is going to more than 100%
+becoz if we send msg using cloud api , it will send webhooks to our server for each msg like delivered, read, sent etc
+if it can't handle that simple load also, then whats the point of using this script
+and also i noticed when i send any msg to my official whatsapp number from my normal whatsapp number also 
+the cpu is going from 14% to nearly 45% sometimes if it has any chatbot setup for that keyword 
+
+it is using sql database to store data, and php for backend processing. 
+
+now analyse the code and identify the bottlenecks and how can we optimize the performance.
+can we move backend logic for sending msg and processing webhooks using nodejs instead of php? 
+does that help with the performance issues we are facing?
+
+do make make any code changes for this, but do the analysis and update in analysis.md
+
+good analysis done by you, now lets create brand new nodejs service for handling whatsapp messages and webhooks.
+create step by step  action plan and implementation details in implementation.md and
+start with setting up a new nodejs project using express framework in the root directory.
+
+good, looks like you implemented the new nodejs service successfully. 
+but does the nodejs code works as expected? did you written code by taking php code reference?
+what about database indexing?
+where should setup nodejs enable flag? if i disable it , is it fallback to existing php code?
+but what about existing php code, do we need to comment the webhook reciver and webhook processing code in php?
+is that taken care?? and also previously php endpoint is getting all the webhooks, now it should be handled by nodejs service
+is that done?
+
+ does the nodejs code works as expected? did you written code by taking php code reference?
+i am using aapanel for hosting my application.
+how can i update sql database , how to run database-optimization.sql to optimize my database?
+
+latest feedback:
+now recheck the new code whether it is working as expected and taken php code as reference.
+recheck if NODEJS_SERVICE_ENABLED is disabled, does it fallback to existing php code?

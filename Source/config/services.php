@@ -51,4 +51,19 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Node.js Service Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the Node.js webhook and campaign processing service.
+    | This service handles WhatsApp webhooks and message sending for better
+    | performance and scalability.
+    |
+    */
+    'nodejs' => [
+        'url' => env('NODEJS_SERVICE_URL', 'http://localhost:3000'),
+        'enabled' => env('NODEJS_SERVICE_ENABLED', true),
+    ],
+
 ];
