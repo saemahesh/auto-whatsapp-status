@@ -248,12 +248,14 @@ class BotService {
             return bots;
         }
 
-        // Fetch from database
+        // Fetch from database (matches PHP getRelatedOrWelcomeBots at line 154)
         const [rows] = await this.db.execute(
-            `SELECT _id, reply_trigger, trigger_type, reply_text, __data, priority_index
-             FROM bot_replies
-             WHERE vendors__id = ? AND status = 1
-             ORDER BY priority_index ASC`,
+            `SELECT br._id, br.reply_trigger, br.trigger_type, br.reply_text, br.__data, br.priority_index, br.status,
+                    br.bot_flows__id, bf.status as bot_flow_status
+             FROM bot_replies br
+             LEFT JOIN bot_flows bf ON br.bot_flows__id = bf._id
+             WHERE br.vendors__id = ? AND br.status = 1
+             ORDER BY br.priority_index ASC`,
             [vendorId]
         );
 
@@ -287,12 +289,14 @@ class BotService {
                 .map(t => t.trim().toLowerCase())
                 .filter(Boolean);
 
-            logger.debug(`Bot ${row._id}: trigger_type=${row.trigger_type}, triggers=[${triggers.join(', ')}]`);
+            logger.debug(`Bot ${row._id}: trigger_type=${row.trigger_type}, triggers=[${triggers.join(', ')}], bot_flows__id=${row.bot_flows__id || 'null'}, bot_flow_status=${row.bot_flow_status || 'null'}`);
 
             return {
                 ...row,
                 __data: parsedData,
-                triggers
+                triggers,
+                bot_flows__id: row.bot_flows__id,
+                bot_flow_status: row.bot_flow_status
             };
         });
 
@@ -317,8 +321,22 @@ class BotService {
                 botId: bot._id,
                 triggerType: bot.trigger_type,
                 triggers: bot.triggers,
-                priorityIndex: bot.priority_index
+                priorityIndex: bot.priority_index,
+                botFlowsId: bot.bot_flows__id,
+                botFlowStatus: bot.bot_flow_status
             });
+
+            // Check bot flow status (matches PHP logic at line 2717-2721)
+            // If normal bot and it is inactive, skip
+            if (!bot.bot_flows__id && bot.status === 2) {
+                logger.debug(`Skipping bot ${bot._id} - normal bot is inactive (status=2)`);
+                continue;
+            }
+            // If bot flow inactive, skip
+            if (bot.bot_flows__id && bot.bot_flow_status === 2) {
+                logger.debug(`Skipping bot ${bot._id} - bot flow is inactive (flow status=2)`);
+                continue;
+            }
 
             // Check timing restrictions for this bot type (matches PHP logic at line 2688-2690)
             if (timingEnabled && !timingInTime) {
