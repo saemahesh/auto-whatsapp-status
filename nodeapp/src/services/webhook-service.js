@@ -90,62 +90,211 @@ class WebhookService {
         const messageType = message.type;
         const timestamp = message.timestamp;
 
+        // Skip welcome and deleted messages (matches PHP logic)
+        if (messageType === 'request_welcome') {
+            return { processed: false, reason: 'welcome_message' };
+        }
+
+        // Check for deleted message error (matches PHP)
+        if (message.errors && message.errors[0]?.code === 131051) {
+            return { processed: false, reason: 'deleted_message' };
+        }
+
         // Get or create contact
         let contactId = await this.getOrCreateContact(vendorId, waId, contact);
 
-        // Extract message body based on type
-        let messageBody = '';
-        if (messageType === 'text') {
-            messageBody = message.text?.body;
-        } else if (messageType === 'interactive') {
-            messageBody = message.interactive?.button_reply?.title || 
-                         message.interactive?.list_reply?.title;
-        } else if (messageType === 'button') {
-            messageBody = message.button?.text;
+        // Prevent duplicate message creation (matches PHP hasLogEntryOfMessage check)
+        const [existingMsg] = await this.db.execute(
+            'SELECT _id FROM whatsapp_message_logs WHERE wamid = ? AND vendors__id = ?',
+            [wamid, vendorId]
+        );
+
+        if (existingMsg.length > 0) {
+            logger.info(`Duplicate message skipped: ${wamid}`);
+            return { processed: false, reason: 'duplicate_message' };
         }
 
-        // Store message in database
+        // Extract message body and media data based on type (matches PHP logic)
+        let messageBody = '';
+        let mediaData = null;
+        let otherMessageData = null;
+
+        if (messageType === 'text') {
+            messageBody = message.text?.body;
+        } 
+        else if (messageType === 'interactive') {
+            messageBody = message.interactive?.button_reply?.title || 
+                         message.interactive?.list_reply?.title ||
+                         JSON.stringify(message.interactive?.nfm_reply?.response_json);
+        } 
+        else if (messageType === 'button') {
+            messageBody = message.button?.text;
+        }
+        else if (['image', 'video', 'audio', 'document', 'sticker'].includes(messageType)) {
+            // Store media information (matches PHP media handling)
+            mediaData = {
+                type: messageType,
+                id: message[messageType]?.id,
+                mime_type: message[messageType]?.mime_type,
+                caption: message[messageType]?.caption,
+                sha256: message[messageType]?.sha256
+            };
+            messageBody = message[messageType]?.caption || `[${messageType}]`;
+        }
+        else if (['location', 'contacts'].includes(messageType)) {
+            // Store location/contacts data (matches PHP)
+            otherMessageData = {
+                type: messageType,
+                data: message[messageType]
+            };
+            messageBody = messageType === 'location' 
+                ? `[Location: ${message.location?.latitude}, ${message.location?.longitude}]`
+                : `[Contact]`;
+        }
+
+        // Handle reactions (matches PHP logic)
+        let repliedToWamid = null;
+        if (message.reaction) {
+            messageBody = message.reaction.emoji;
+            repliedToWamid = message.reaction.message_id;
+        } else if (message.context?.id) {
+            // Regular reply
+            repliedToWamid = message.context.id;
+        }
+
+        // Find replied message if exists
+        let repliedToMessageId = null;
+        if (repliedToWamid) {
+            const [repliedRows] = await this.db.execute(
+                'SELECT _id FROM whatsapp_message_logs WHERE wamid = ? AND vendors__id = ?',
+                [repliedToWamid, vendorId]
+            );
+            if (repliedRows.length > 0) {
+                repliedToMessageId = repliedRows[0]._id;
+            }
+        }
+
+        // Store message in database (matches PHP schema)
+        const insertData = {
+            wamid,
+            vendors__id: vendorId,
+            contacts__id: contactId,
+            phone_number_id: phoneNumberId,
+            message: messageBody,
+            message_type: messageType,
+            is_incoming_message: 1,
+            replied_to_whatsapp_message_logs__id: repliedToMessageId,
+            __data: JSON.stringify({
+                media: mediaData,
+                other: otherMessageData,
+                timestamp: timestamp
+            }),
+            created_at: new Date(timestamp * 1000),
+            updated_at: new Date()
+        };
+
         await this.db.execute(
             `INSERT INTO whatsapp_message_logs 
              (wamid, vendors__id, contacts__id, phone_number_id, message, 
-              message_type, is_incoming_message, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, 1, FROM_UNIXTIME(?), NOW())`,
-            [wamid, vendorId, contactId, phoneNumberId, messageBody, messageType, timestamp]
+              message_type, is_incoming_message, replied_to_whatsapp_message_logs__id,
+              __data, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                insertData.wamid,
+                insertData.vendors__id,
+                insertData.contacts__id,
+                insertData.phone_number_id,
+                insertData.message,
+                insertData.message_type,
+                insertData.is_incoming_message,
+                insertData.replied_to_whatsapp_message_logs__id,
+                insertData.__data,
+                insertData.created_at,
+                insertData.updated_at
+            ]
         );
 
-        // Process bot reply if message has text
-        if (messageBody) {
-            await this.botService.checkAndReply(vendorId, contactId, waId, messageBody, phoneNumberId);
+        // Process bot reply only for text-based messages (matches PHP logic)
+        if (messageBody && ['text', 'interactive', 'button'].includes(messageType)) {
+            await this.botService.checkAndReply(vendorId, contactId, waId, messageBody);
         }
 
-        logger.info(`Incoming message stored: ${wamid} from ${waId}`);
-        return { processed: true, contactId: contactId };
+        logger.info(`Incoming message stored: ${wamid} from ${waId}, type: ${messageType}`);
+        return { processed: true, contactId: contactId, messageType: messageType };
     }
 
     async getOrCreateContact(vendorId, waId, contactData) {
-        // Try to find existing contact
+        // Try to find existing contact (matches PHP getVendorContactByWaId)
         const [rows] = await this.db.execute(
-            'SELECT _id FROM contacts WHERE vendors__id = ? AND wa_id = ?',
+            'SELECT _id, _uid, first_name FROM contacts WHERE vendors__id = ? AND wa_id = ?',
             [vendorId, waId]
         );
 
         if (rows.length > 0) {
-            return rows[0]._id;
+            const contact = rows[0];
+            
+            // Update contact name if empty (matches PHP logic)
+            if (!contact.first_name && contactData?.profile?.name) {
+                const profileName = contactData.profile.name;
+                const nameParts = profileName.split(' ');
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ');
+
+                await this.db.execute(
+                    'UPDATE contacts SET first_name = ?, last_name = ?, updated_at = NOW() WHERE _id = ?',
+                    [firstName, lastName, contact._id]
+                );
+
+                logger.info(`Contact name updated: ${waId}`);
+            }
+            
+            return contact._id;
         }
 
-        // Create new contact
-        const profileName = contactData?.profile?.name || '';
-        const firstName = profileName.split(' ')[0] || '';
-        const lastName = profileName.replace(firstName, '').trim();
+        // Check plan limits before creating (matches PHP vendorPlanDetails check)
+        const [countResult] = await this.db.execute(
+            'SELECT COUNT(*) as count FROM contacts WHERE vendors__id = ?',
+            [vendorId]
+        );
+        
+        // Note: Actual plan limit check should be implemented based on vendor's subscription
+        // For now, we're allowing contact creation (PHP also allows if no limit)
 
-        const [result] = await this.db.execute(
-            `INSERT INTO contacts (vendors__id, wa_id, first_name, last_name, phone_number, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-            [vendorId, waId, firstName, lastName, waId]
+        // Create new contact with UID (matches PHP storeContact)
+        const profileName = contactData?.profile?.name || '';
+        const nameParts = profileName.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ');
+        const contactUid = this.generateUid();
+
+        await this.db.execute(
+            `INSERT INTO contacts 
+             (_uid, vendors__id, wa_id, first_name, last_name, phone_number, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+            [contactUid, vendorId, waId, firstName, lastName, waId]
         );
 
-        logger.info(`New contact created: ${waId}`);
-        return result.insertId;
+        // Get the newly created contact ID
+        const [newContact] = await this.db.execute(
+            'SELECT _id FROM contacts WHERE _uid = ?',
+            [contactUid]
+        );
+
+        logger.info(`New contact created: ${waId} with UID: ${contactUid}`);
+        return newContact[0]._id;
+    }
+
+    /**
+     * Generate UID for records (matches PHP YesSecurity::generateUid)
+     * @returns {string}
+     */
+    generateUid() {
+        // Generate a UUID-like string (matches PHP's UID format)
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
 
     async getVendorIdFromUid(vendorUid) {

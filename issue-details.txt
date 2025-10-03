@@ -57,5 +57,56 @@ i am using aapanel for hosting my application.
 how can i update sql database , how to run database-optimization.sql to optimize my database?
 
 latest feedback:
-now recheck the new code whether it is working as expected and taken php code as reference.
-recheck if NODEJS_SERVICE_ENABLED is disabled, does it fallback to existing php code?
+root@srv522550:/www/wwwroot/whatsapi.robomate.in# cat .env
+APP_NAME="whatsjet"
+# Use 'production' for live uses
+APP_ENV=local
+# Set to true for debugging
+APP_DEBUG=true
+# application key
+APP_KEY=base64:ExktIRBYZDy3+mCubhTdhwO/v64GCsK1RuoW4z84LSc=
+# Database Host
+DB_HOST=localhost
+# Database Name
+DB_DATABASE=whatapi
+# Database Username
+DB_USERNAME=whatapi
+# Database Password
+DB_PASSWORD=4YJ7ezCXGFDE66Ja
+# Mail Configuration
+MAIL_MAILER=sendmail
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS=null
+MAIL_FROM_NAME="${APP_NAME}"
+root@srv522550:/www/wwwroot/whatsapi.robomate.in# 
+
+this is my current .env in prod server, apply same to nodejs and 
+run nodejs in port 3006
+
+currenly i set APP_ENV TO local, is it causing issues in production?
+shall i change it to production?
+
+and also in your new nodejs project .env file you kept
+WEBHOOK_VERIFY_TOKEN , why ? we do not have this in php .env
+check it properly and make necessary changes.
+
+and also php script using whatsapp cloud api version 23 , why are you using 17?
+
+you might have missed some other important code as well, 
+please recheck the nodejs code once again and make necessary changes
+
+latest feedback: (check again)
+again recheck nodejs code is intact with php code
+check file by file , check parameters, values and logic etc
+
+do not run cat command to write to actionplan.txt, it is stucking terminal, i already updated it manually
+checked all files and function in nodejs with php code??
+first create list of all functions and its calling other functions in nodejs code in actionplan.txt and check with php code
+and once checking is done, mark that function as done and move to the next
+like this ensure all functions are covered and any discrepancies are fixed
+
+move all md files to readme directory

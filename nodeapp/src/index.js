@@ -10,7 +10,7 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3006;  // Changed from 3000 to 3006 for production
 
 // Middleware
 app.use(helmet());  // Security headers

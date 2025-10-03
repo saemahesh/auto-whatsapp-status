@@ -9,27 +9,55 @@ class CampaignService {
 
     async processCampaignSchedule() {
         try {
-            // Get pending messages from queue
+            // 1. Handle stuck messages (matches PHP stuckInProcessing)
+            // Messages stuck in processing for more than 5 minutes
+            const [stuckResult] = await this.db.execute(
+                `UPDATE whatsapp_message_queue 
+                 SET status = 6, updated_at = NOW()
+                 WHERE status = 3 
+                 AND scheduled_at <= NOW() 
+                 AND updated_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)`
+            );
+
+            if (stuckResult.affectedRows > 0) {
+                logger.warn(`Found ${stuckResult.affectedRows} stuck messages, marked as awaiting response`);
+            }
+
+            // 2. Handle expired messages (matches PHP expiry check)
+            // Mark messages with past expiry_at as expired (status 5)
+            await this.db.execute(
+                `UPDATE whatsapp_message_queue 
+                 SET status = 5, updated_at = NOW()
+                 WHERE status = 1 
+                 AND JSON_EXTRACT(__data, '$.expiry_at') IS NOT NULL
+                 AND JSON_EXTRACT(__data, '$.expiry_at') <= NOW()`
+            );
+
+            // 3. Get batch size from database (matches PHP getAppSettings('cron_process_messages_per_lot'))
+            // Fetches from configurations table with caching
+            const batchSize = await this.getBatchSize();
+            
             const [messages] = await this.db.execute(
-                `SELECT _uid, vendors__id, phone_with_country_code, __data
+                `SELECT _uid, vendors__id, phone_with_country_code, __data, retries
                  FROM whatsapp_message_queue
                  WHERE status = 1 
                  AND scheduled_at <= NOW()
                  ORDER BY scheduled_at ASC
-                 LIMIT 100`
+                 LIMIT ?`,
+                [batchSize]
             );
 
-            logger.info(`Found ${messages.length} messages to send`);
+            if (messages.length === 0) {
+                return { processed: 0, message: 'Nothing to process' };
+            }
+
+            logger.info(`Found ${messages.length} messages to send (batch size: ${batchSize})`);
 
             for (const message of messages) {
                 const data = JSON.parse(message.__data);
                 const campaignData = data.campaign_data;
 
-                // Get vendor settings
-                const phoneNumberId = await this.getVendorPhoneNumberId(message.vendors__id);
-                const accessToken = await this.getVendorAccessToken(message.vendors__id);
-
-                // Add to queue
+                // Add to BullMQ queue with retry count
                 await messageQueue.add('send-message', {
                     queueUid: message._uid,
                     vendorId: message.vendors__id,
@@ -37,13 +65,12 @@ class CampaignService {
                     templateName: campaignData.whatsAppTemplateName,
                     language: campaignData.whatsAppTemplateLanguage,
                     components: campaignData.messageComponents,
-                    phoneNumberId: phoneNumberId,
-                    accessToken: accessToken
+                    retries: message.retries || 0
                 });
 
-                // Update status to processing
+                // Update status to processing (3)
                 await this.db.execute(
-                    'UPDATE whatsapp_message_queue SET status = 3 WHERE _uid = ?',
+                    'UPDATE whatsapp_message_queue SET status = 3, updated_at = NOW() WHERE _uid = ?',
                     [message._uid]
                 );
             }
@@ -55,30 +82,38 @@ class CampaignService {
         }
     }
 
-    async getVendorPhoneNumberId(vendorId) {
-        const cached = await this.redis.get(`vendor:${vendorId}:phone_number_id`);
-        if (cached) return cached;
+    /**
+     * Get batch size from database configurations table (matches PHP getAppSettings)
+     * @returns {Promise<number>}
+     */
+    async getBatchSize() {
+        // Try cache first (matches PHP viaFlashCache)
+        const cacheKey = 'app_setting:cron_process_messages_per_lot';
+        const cached = await this.redis.get(cacheKey);
+        
+        if (cached) {
+            return parseInt(cached);
+        }
 
-        const [rows] = await this.db.execute(
-            'SELECT configuration_value FROM vendor_settings WHERE vendors__id = ? AND name = ?',
-            [vendorId, 'current_phone_number_id']
-        );
+        try {
+            // Fetch from configurations table (matches PHP ConfigurationModel)
+            const [rows] = await this.db.execute(
+                `SELECT value FROM configurations 
+                 WHERE name = 'cron_process_messages_per_lot' 
+                 LIMIT 1`
+            );
 
-        if (rows.length === 0) throw new Error('Phone number ID not found');
+            // Default to 60 if not found (matches PHP default)
+            const batchSize = rows.length > 0 ? parseInt(rows[0].value) : 60;
 
-        const value = rows[0].configuration_value;
-        await this.redis.setex(`vendor:${vendorId}:phone_number_id`, 3600, value);
-        return value;
-    }
+            // Cache for 5 minutes (matches PHP flash cache duration)
+            await this.redis.setex(cacheKey, 300, batchSize);
 
-    async getVendorAccessToken(vendorId) {
-        const [rows] = await this.db.execute(
-            'SELECT configuration_value FROM vendor_settings WHERE vendors__id = ? AND name = ?',
-            [vendorId, 'whatsapp_access_token']
-        );
-
-        if (rows.length === 0) throw new Error('Access token not found');
-        return rows[0].configuration_value;
+            return batchSize;
+        } catch (error) {
+            logger.error('Error fetching batch size from DB, using default 60:', error.message);
+            return 60; // Fallback to default
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const WhatsAppAPI = require('../config/whatsapp');
+const whatsappApi = require('../config/whatsapp');
 
 class BotService {
     constructor(db, redis) {
@@ -7,7 +7,7 @@ class BotService {
         this.redis = redis;
     }
 
-    async checkAndReply(vendorId, contactId, waId, messageBody, phoneNumberId) {
+    async checkAndReply(vendorId, contactId, waId, messageBody) {
         try {
             // Get contact's bot preferences
             const [contactRows] = await this.db.execute(
@@ -27,7 +27,7 @@ class BotService {
 
             if (matchedBot) {
                 logger.info(`Bot matched: ${matchedBot._id} for message: ${messageBody}`);
-                await this.sendBotReply(vendorId, contactId, waId, matchedBot, phoneNumberId);
+                await this.sendBotReply(vendorId, contactId, waId, matchedBot);
                 return { matched: true, botId: matchedBot._id };
             }
 
@@ -105,28 +105,83 @@ class BotService {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    async sendBotReply(vendorId, contactId, waId, bot, phoneNumberId) {
+    async sendBotReply(vendorId, contactId, waId, bot) {
         try {
-            // Get WhatsApp credentials
-            const accessToken = await this.getVendorAccessToken(vendorId);
-            const whatsapp = new WhatsAppAPI(phoneNumberId, accessToken);
+            // Get message data from __data field (matches PHP)
+            const interactionMessageData = bot.__data?.interaction_message || null;
+            const mediaMessageData = bot.__data?.media_message || null;
+            const templateMessageData = bot.__data?.template_message || null;
 
-            // Replace dynamic values in reply text
-            const replyText = await this.replaceDynamicValues(bot.reply_text, contactId);
+            let result;
+            let messageType = 'text';
+            let messageContent = bot.reply_text;
 
-            // Send message
-            const result = await whatsapp.sendTextMessage(waId, replyText);
+            // Send interactive message if configured (matches PHP logic at line 2403)
+            if (interactionMessageData) {
+                messageType = 'interactive';
+                result = await whatsappApi.sendInteractiveMessage(
+                    vendorId,
+                    waId,
+                    interactionMessageData
+                );
+            } 
+            // Send media message if configured (matches PHP logic at line 2440)
+            else if (mediaMessageData) {
+                messageType = 'media';
+                const mediaType = mediaMessageData.header_type; // image, video, document, audio
+                const fileUrl = mediaMessageData.media_link;
+                const fileName = mediaMessageData.file_name;
+                const caption = mediaMessageData.caption || '';
+
+                // Use media_id if available and not expired (matches PHP logic)
+                let mediaLink = fileUrl;
+                if (mediaMessageData.media_id && 
+                    mediaMessageData.media_id_expiry_at && 
+                    new Date(mediaMessageData.media_id_expiry_at) > new Date()) {
+                    mediaLink = { id: mediaMessageData.media_id };
+                }
+
+                result = await whatsappApi.sendMediaMessage(
+                    vendorId,
+                    waId,
+                    mediaType,
+                    mediaLink,
+                    caption,
+                    fileName
+                );
+                messageContent = caption;
+            }
+            // Send template message if configured
+            else if (templateMessageData) {
+                messageType = 'template';
+                result = await whatsappApi.sendTemplateMessage(
+                    vendorId,
+                    waId,
+                    templateMessageData.name,
+                    templateMessageData.language?.code || 'en',
+                    templateMessageData.components || []
+                );
+                messageContent = `Template: ${templateMessageData.name}`;
+            }
+            // Default: send text message
+            else {
+                // Replace dynamic values in reply text
+                messageContent = await this.replaceDynamicValues(bot.reply_text, contactId);
+                result = await whatsappApi.sendTextMessage(vendorId, waId, messageContent);
+            }
 
             if (result.success) {
-                // Log bot reply
+                // Log bot reply (matches PHP updateOrCreateWhatsAppMessageFromWebhook)
                 await this.db.execute(
                     `INSERT INTO whatsapp_message_logs 
-                     (wamid, vendors__id, contacts__id, message, bot_replies__id, is_incoming_message, created_at, updated_at)
-                     VALUES (?, ?, ?, ?, ?, 0, NOW(), NOW())`,
-                    [result.wamid, vendorId, contactId, replyText, bot._id]
+                     (wamid, vendors__id, contacts__id, message, message_type, bot_replies__id, is_incoming_message, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
+                    [result.wamid, vendorId, contactId, messageContent, messageType, bot._id]
                 );
 
-                logger.info(`Bot reply sent: ${result.wamid}`);
+                logger.info(`Bot reply sent: ${result.wamid} (type: ${messageType})`);
+            } else {
+                logger.error(`Bot reply failed for bot ${bot._id}:`, result.error);
             }
 
             return result;
@@ -151,15 +206,6 @@ class BotService {
             .replace(/\{\{last_name\}\}/g, contact.last_name || '')
             .replace(/\{\{email\}\}/g, contact.email || '')
             .replace(/\{\{phone\}\}/g, contact.phone_number || '');
-    }
-
-    async getVendorAccessToken(vendorId) {
-        const [rows] = await this.db.execute(
-            'SELECT configuration_value FROM vendor_settings WHERE vendors__id = ? AND name = ?',
-            [vendorId, 'whatsapp_access_token']
-        );
-
-        return rows[0]?.configuration_value;
     }
 }
 
