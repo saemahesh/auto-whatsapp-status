@@ -467,19 +467,32 @@ class BotService {
 
             if (result.success) {
                 // Log bot reply (matches PHP updateOrCreateWhatsAppMessageFromWebhook)
+                // bot_reply is stored in __data->options, not as separate column
+                const messageLogData = {
+                    options: {
+                        bot_reply: true,
+                        ai_bot_reply: false
+                    },
+                    bot_replies__id: bot._id, // Store bot ID in __data for reference
+                    message_type: messageType,
+                    initial_response: {
+                        accepted: result.response || {}
+                    }
+                };
+
                 await this.db.execute(
                     `INSERT INTO whatsapp_message_logs 
-                     (_uid, wamid, vendors__id, contacts__id, message, bot_replies__id, is_incoming_message, 
-                      __data, created_at, updated_at)
-                     VALUES (?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW())`,
+                     (_uid, wamid, vendors__id, contacts__id, message, wab_phone_number_id, 
+                      status, is_incoming_message, __data, messaged_at, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, ?, ?, 'accepted', 0, ?, NOW(), NOW(), NOW())`,
                     [
                         this.generateUid(),
                         result.wamid, 
                         vendorId, 
                         contactId, 
-                        messageContent, 
-                        bot._id,
-                        JSON.stringify({ message_type: messageType })
+                        messageContent,
+                        phoneNumberId, // Add phone number ID like PHP does
+                        JSON.stringify(messageLogData)
                     ]
                 );
 
