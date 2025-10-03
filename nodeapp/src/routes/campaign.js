@@ -7,9 +7,14 @@ const logger = require('../utils/logger');
 
 // Trigger campaign processing (called by PHP or cron)
 router.post('/process', async (req, res) => {
+    console.log('[CAMPAIGN] ▶ Processing request received at', new Date().toISOString());
+    
     try {
         const campaignService = new CampaignService(db, redis);
+        console.log('[CAMPAIGN] CampaignService initialized, processing...');
+        
         const result = await campaignService.processCampaignSchedule();
+        console.log('[CAMPAIGN] ✓ Processing complete:', result);
         
         res.json({
             success: true,
@@ -17,6 +22,7 @@ router.post('/process', async (req, res) => {
         });
     } catch (error) {
         logger.error('Campaign trigger error:', error);
+        console.error('[CAMPAIGN] ✗ Error:', error);
         res.status(500).json({
             success: false,
             error: error.message

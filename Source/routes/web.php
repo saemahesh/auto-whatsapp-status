@@ -1350,7 +1350,7 @@ Route::get('/custom-styles.css', [
 // whatsapp webhook - WITH NODE.JS INTEGRATION AND PHP FALLBACK
 // DO NOT CHANGE THE PATH as it described in CSRF protection
 Route::any('whatsapp-webhook/{vendorUid}', function ($vendorUid, Request $request) {
-    $nodeJsUrl = config('services.nodejs.url', 'http://localhost:3006');
+    $nodeJsUrl = config('services.nodejs.url', 'http://127.0.0.1:3006');
     $nodeJsEnabled = config('services.nodejs.enabled', true);
     
     \Log::info('[PHP WEBHOOK] Received webhook request', [
@@ -1358,8 +1358,8 @@ Route::any('whatsapp-webhook/{vendorUid}', function ($vendorUid, Request $reques
         'method' => $request->method(),
         'nodeJsUrl' => $nodeJsUrl,
         'nodeJsEnabled' => $nodeJsEnabled,
-        'query' => $request->query(),
-        'has_body' => !empty($request->all())
+        'query' => $request->query->all(),
+        'has_body' => !empty($request->getContent())
     ]);
     
     // If Node.js is disabled, use original PHP processing
@@ -1372,7 +1372,7 @@ Route::any('whatsapp-webhook/{vendorUid}', function ($vendorUid, Request $reques
     if ($request->isMethod('GET')) {
         \Log::info('[PHP WEBHOOK] GET request - forwarding to Node.js for verification');
         try {
-            $response = Http::timeout(5)->get("{$nodeJsUrl}/webhook/{$vendorUid}", $request->all());
+            $response = Http::timeout(5)->get("{$nodeJsUrl}/webhook/{$vendorUid}", $request->query->all());
             \Log::info('[PHP WEBHOOK] Node.js verification response', [
                 'status' => $response->status(),
                 'body' => $response->body()
@@ -1380,8 +1380,7 @@ Route::any('whatsapp-webhook/{vendorUid}', function ($vendorUid, Request $reques
             return response($response->body(), $response->status());
         } catch (\Exception $e) {
             \Log::error('[PHP WEBHOOK] Verification via Node.js failed, falling back to PHP', [
-                'error' => $e->getMessage(),
-                'url' => "{$nodeJsUrl}/webhook/{$vendorUid}"
+                'error' => $e->getMessage()
             ]);
             // Fallback to PHP processing
             return app(WhatsAppServiceController::class)->webhook($request, $vendorUid);
@@ -1389,16 +1388,36 @@ Route::any('whatsapp-webhook/{vendorUid}', function ($vendorUid, Request $reques
     }
     
     // Handle POST request (webhook from WhatsApp)
-    \Log::info('[PHP WEBHOOK] POST request - forwarding to Node.js asynchronously', [
-        'payload_size' => strlen(json_encode($request->all()))
+    \Log::info('[PHP WEBHOOK] POST request - forwarding to Node.js', [
+        'payload_size' => strlen($request->getContent()),
+        'content_type' => $request->header('Content-Type')
     ]);
     
-    // Return 200 immediately and forward to Node.js asynchronously
+    // Forward to Node.js with proper error handling
     try {
-        Http::async()->timeout(5)->post("{$nodeJsUrl}/webhook/{$vendorUid}", $request->all());
-        \Log::info('[PHP WEBHOOK] Successfully forwarded to Node.js');
+        // Get the raw request body for POST requests
+        $payload = json_decode($request->getContent(), true) ?: [];
+        
+        \Log::info('[PHP WEBHOOK] Payload decoded', [
+            'payload_keys' => array_keys($payload),
+            'has_entry' => isset($payload['entry'])
+        ]);
+        
+        // Send to Node.js with wait (but short timeout)
+        $response = Http::timeout(3)->post("{$nodeJsUrl}/webhook/{$vendorUid}", $payload);
+        
+        if ($response->successful()) {
+            \Log::info('[PHP WEBHOOK] Successfully forwarded to Node.js', [
+                'status' => $response->status()
+            ]);
+        } else {
+            \Log::warning('[PHP WEBHOOK] Node.js returned non-200', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+        }
     } catch (\Exception $e) {
-        \Log::warning('[PHP WEBHOOK] Forwarding to Node.js failed, falling back to PHP', [
+        \Log::error('[PHP WEBHOOK] Forwarding to Node.js failed', [
             'error' => $e->getMessage(),
             'url' => "{$nodeJsUrl}/webhook/{$vendorUid}"
         ]);

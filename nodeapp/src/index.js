@@ -5,17 +5,13 @@ const compression = require('compression');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 
-console.log('========================================');
-console.log('[STARTUP] Loading environment variables...');
 // Load environment variables
 dotenv.config();
 
-console.log('[STARTUP] Initializing Express app...');
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3006;
 
-console.log('[STARTUP] Configuring middleware...');
 // Middleware
 app.use(helmet());  // Security headers
 app.use(cors());    // Enable CORS
@@ -24,54 +20,82 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));  // Request logging
 
-console.log('[STARTUP] Loading routes...');
+// Debug middleware - log ALL incoming requests
+app.use((req, res, next) => {
+    console.log(`[EXPRESS] ${req.method} ${req.path} - ${new Date().toISOString()}`);
+    console.log(`[EXPRESS] Headers:`, JSON.stringify(req.headers, null, 2));
+    if (req.body && Object.keys(req.body).length > 0) {
+        console.log(`[EXPRESS] Body:`, JSON.stringify(req.body, null, 2));
+    }
+    next();
+});
+
 // Routes
 const webhookRoutes = require('./routes/webhook');
 const campaignRoutes = require('./routes/campaign');
 const healthRoutes = require('./routes/health');
 
-console.log('[STARTUP] Registering route handlers...');
+// Simple test endpoint
+app.get('/test', (req, res) => {
+    console.log('[TEST] Test endpoint hit!');
+    res.json({ 
+        status: 'ok', 
+        message: 'Node.js service is running',
+        timestamp: new Date().toISOString() 
+    });
+});
+
 app.use('/webhook', webhookRoutes);
 app.use('/campaign', campaignRoutes);
 app.use('/health', healthRoutes);
-console.log('[ROUTES] Registered: /webhook, /campaign, /health');
 
 // Error handler
 app.use((err, req, res, next) => {
-    console.error('[ERROR HANDLER] Error caught:', err);
+    console.error('Error:', err);
     res.status(500).json({
         success: false,
         error: err.message
     });
 });
 
-console.log('[STARTUP] Starting server on port', PORT);
-// Start server
-app.listen(PORT, () => {
+// Start server - bind to 127.0.0.1 for production
+const HOST = '127.0.0.1';
+const server = app.listen(PORT, HOST, () => {
     console.log(`
     ╔═══════════════════════════════════════╗
     ║  WhatsJet Node.js Service Started    ║
+    ║  Host: ${HOST}                        ║
     ║  Port: ${PORT}                        ║
     ║  Environment: ${process.env.NODE_ENV || 'development'} ║
     ╚═══════════════════════════════════════╝
     `);
-    console.log('[SERVER] HTTP server is listening on port', PORT);
-    console.log('[SERVER] Webhook endpoint: http://localhost:' + PORT + '/webhook/:vendorUid');
+    console.log(`[SERVER] Listening on http://${HOST}:${PORT}`);
+    console.log('[SERVER] Test endpoint: http://${HOST}:${PORT}/test');
 });
 
-console.log('[STARTUP] Starting workers...');
-// Start workers
-require('./workers/webhook-worker');
-require('./workers/campaign-worker');
+server.on('error', (err) => {
+    console.error('[SERVER] ✗ Failed to start server:', err);
+    process.exit(1);
+});
 
-console.log('[WORKERS] ✓ Webhook worker loaded');
-console.log('[WORKERS] ✓ Campaign worker loaded');
-console.log('[STARTUP] ✓ All workers started successfully');
-console.log('========================================');
+// Start workers with error handling
+try {
+    console.log('[WORKERS] Loading webhook-worker...');
+    require('./workers/webhook-worker');
+    console.log('[WORKERS] ✓ Webhook worker loaded');
+    
+    console.log('[WORKERS] Loading campaign-worker...');
+    require('./workers/campaign-worker');
+    console.log('[WORKERS] ✓ Campaign worker loaded');
+    
+    console.log('[WORKERS] ✓ All workers started successfully');
+} catch (err) {
+    console.error('[WORKERS] ✗ Failed to start workers:', err);
+    // Continue running the server even if workers fail
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('[SHUTDOWN] SIGTERM received, shutting down gracefully...');
+    console.log('SIGTERM received, shutting down gracefully...');
     process.exit(0);
 });
-

@@ -56,5 +56,27 @@ and also check why the webhook is not working properly
 and also why 4 pm2 processes are running for nodejs service,
 keep it simple and only 1 process should run all the services / nodejs cron jobs
 
-still i can't see any webhook logs when i do pm2 logs whatsjet-nodejs
-is php service forwaring the webhook to nodejs service properly?
+i am able to see php logs 
+2025-10-03 08:55:51] local.INFO: Node.js campaign processing triggered {"processed":0} 
+[2025-10-03 08:55:56] local.INFO: Node.js campaign processing triggered {"processed":0} 
+[2025-10-03 08:56:01] local.INFO: Node.js campaign processing triggered {"processed":0} 
+[2025-10-03 08:56:03] local.INFO: [PHP WEBHOOK] Received webhook request {"vendorUid":"59806f99-2532-4b73-a941-2178f1255d1f","method":"POST","nodeJsUrl":"http://localhost:3006","nodeJsEnabled":true,"query":[],"has_body":true} 
+[2025-10-03 08:56:03] local.INFO: [PHP WEBHOOK] POST request - forwarding to Node.js asynchronously {"payload_size":483} 
+[2025-10-03 08:56:04] local.INFO: [PHP WEBHOOK] Successfully forwarded to Node.js  
+[2025-10-03 08:56:06] local.INFO: Node.js campaign processing triggered {"processed":0} 
+[2025-10-03 08:56:11] local.INFO: Node.js campaign processing triggered {"processed":0} 
+[2025-10-03 08:56:16] local.INFO: Node.js campaign processing triggered {"processed":0} 
+[2025-10-03 08:56:21
+
+but i am not able to see any logs in nodejs service when i do pm2 logs whatsjet-nodejs
+name is correct: whatsjet-nodejs
+app is running also, i can see POST /campaign/process logs every 5 seconds
+
+i think you added only logs thingking it is suppressign logs? 
+but i think the request is not reaching nodejs process, 
+does localhost:3006 works in linux server in prod ? 
+
+again, 
+i removed webhook.js code changes, fix again, why did you removed db , redis, queue related code?
+
+our first priority is to make sure webhook is received properly in nodejs service

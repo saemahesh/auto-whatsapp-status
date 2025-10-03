@@ -62,7 +62,7 @@ return [
     |
     */
     'nodejs' => [
-        'url' => env('NODEJS_SERVICE_URL', 'http://localhost:3006'),
+        'url' => env('NODEJS_SERVICE_URL', 'http://127.0.0.1:3006'),
         'enabled' => env('NODEJS_SERVICE_ENABLED', true),
     ],
 
