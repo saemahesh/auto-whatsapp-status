@@ -1,13 +1,99 @@
 ============================================
-ITERATION 11: COMPLETE FUNCTION AUDIT
+ITERATION 1 (FRESH START): DEBUGGING WEBHOOK ISSUES
 ============================================
 
-## Question: "did you really make sure that all functions in nodejs are matching with php code?"
+## Current Issue from issue-details.txt:
+- Webhooks are not working (no console logs appearing)
+- 4 PM2 processes running instead of 1
+- Chatbot not responding to incoming messages
 
-## Answer: YES for CRITICAL functions, NO for admin/setup functions
+## Root Causes Identified:
 
-### ✓ CRITICAL FUNCTIONS - ALL IMPLEMENTED (Required for performance)
-These handle message sending, webhook processing, campaigns, bot replies:
+### 1. PM2 Configuration Issue (FIXED):
+**Problem:** ecosystem.config.js had 3 separate apps:
+  - whatsjet-nodejs (2 cluster instances)
+  - whatsjet-webhook-worker (1 instance)
+  - whatsjet-campaign-worker (1 instance)
+  Total = 4 processes
+
+**Fix Applied:** Changed ecosystem.config.js to run only 1 fork process
+  - Single process handles Express server + workers
+  - Removed separate worker processes
+  - Changed from cluster mode to fork mode
+
+### 2. Webhook Route Issue (FIXED):
+**Problem:** webhook.js was trying to call webhookService.processWebhook()
+  but webhookService was required as a class, not instantiated
+
+**Fix Applied:** 
+  - Changed to use BullMQ queue pattern
+  - Webhook route now adds jobs to queue
+  - Worker processes the jobs asynchronously
+  - Properly separates HTTP response from processing
+
+### 3. Missing Console Logs (FIXED):
+**Problem:** No debug logging to troubleshoot webhook flow
+
+**Fix Applied - Added comprehensive logging to:**
+  - nodeapp/src/index.js - Server startup logs
+  - nodeapp/src/routes/webhook.js - GET/POST webhook logs
+  - nodeapp/src/services/webhook-service.js - Processing logs
+  - nodeapp/src/workers/webhook-worker.js - Worker job logs
+  - nodeapp/src/workers/campaign-worker.js - Campaign job logs
+
+## Files Modified in This Iteration:
+
+1. nodeapp/ecosystem.config.js
+   - Reduced to 1 app definition (fork mode, 1 instance)
+   - Removed separate worker app definitions
+
+2. nodeapp/src/index.js
+   - Added detailed startup logging
+   - Added route registration logging
+   - Added worker initialization logging
+
+3. nodeapp/src/routes/webhook.js
+   - Added comprehensive logging to GET endpoint
+   - Added comprehensive logging to POST endpoint
+   - Fixed webhook processing to use queue
+   - Added proper db/redis/Queue imports
+
+4. nodeapp/src/services/webhook-service.js
+   - Added console logs at every major step
+   - Added logging for vendor lookup
+   - Added logging for message routing
+   - Added logging for status updates
+
+5. nodeapp/src/workers/webhook-worker.js
+   - Added job start/end logging
+   - Added payload logging
+   - Added error logging with stack traces
+
+6. nodeapp/src/workers/campaign-worker.js
+   - Added job processing logs
+   - Added API call result logs
+   - Added retry logic logs
+
+## Expected Behavior After This Fix:
+
+When a webhook is received from WhatsApp:
+1. [WEBHOOK POST] logs will appear showing the request
+2. Job will be queued in BullMQ
+3. [WEBHOOK WORKER] logs will show job processing
+4. [WEBHOOK SERVICE] logs will show vendor lookup and routing
+5. Bot response will be sent if chatbot matches keyword
+
+## Next Steps:
+- User needs to restart PM2 process
+- Test by sending message to WhatsApp number
+- Check console logs to debug any remaining issues
+- Read issue-details.txt for feedback
+
+Iteration count: 1/148
+Status: Waiting for testing feedback
+
+============================================
+
 1. ✓ sendTemplateMessage - Campaign messages
 2. ✓ sendTextMessage - Bot text replies  
 3. ✓ sendInteractiveMessage - Bot button/list replies

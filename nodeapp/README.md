@@ -48,7 +48,7 @@ Edit the `.env` file with your settings:
 ```env
 # Node Environment
 NODE_ENV=production
-PORT=3000
+PORT=3006
 
 # Database
 DB_HOST=localhost
@@ -62,8 +62,9 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 
-# WhatsApp
-WEBHOOK_VERIFY_TOKEN=your_webhook_verify_token
+# WhatsApp Cloud API (v23.0)
+# NOTE: No WEBHOOK_VERIFY_TOKEN needed! 
+# Verification uses sha1(vendorUid) - same as PHP
 
 # Logging
 LOG_LEVEL=info
@@ -132,30 +133,12 @@ POST /campaign/process
 ## Architecture
 
 ```
-┌─────────────────┐
-│  PHP Laravel    │ ← Admin Panel
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  MySQL Database │ ← Shared data
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Redis Server   │ ← Queue & Cache
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Node.js API    │ ← This Service
-│  (Port 3000)    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  WhatsApp API   │
-└─────────────────┘
+```
+┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
+│  WhatsApp API   │─────▶│  Node.js Service │─────▶│  MySQL Database │
+│  (Webhooks)     │      │  (Port 3006)     │      │  (Port 3306)    │
+└─────────────────┘      └──────────────────┘      └─────────────────┘
+```
 ```
 
 ## Performance

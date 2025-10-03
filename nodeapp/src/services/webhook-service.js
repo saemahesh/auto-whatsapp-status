@@ -1,60 +1,84 @@
 const logger = require('../utils/logger');
 const BotService = require('./bot-service');
 
+console.log('[WEBHOOK SERVICE] WebhookService module loaded');
+
 class WebhookService {
     constructor(db, redis) {
+        console.log('[WEBHOOK SERVICE] WebhookService instance created');
         this.db = db;
         this.redis = redis;
         this.botService = new BotService(db, redis);
     }
 
     async processWebhook(vendorUid, payload) {
+        console.log('[WEBHOOK SERVICE] processWebhook called');
+        console.log('[WEBHOOK SERVICE] vendorUid:', vendorUid);
+        console.log('[WEBHOOK SERVICE] payload:', JSON.stringify(payload, null, 2));
+        
         // Get vendor ID from UID
+        console.log('[WEBHOOK SERVICE] Getting vendor ID from UID...');
         const vendorId = await this.getVendorIdFromUid(vendorUid);
         if (!vendorId) {
+            console.error('[WEBHOOK SERVICE] ✗ Vendor not found:', vendorUid);
             throw new Error(`Vendor not found: ${vendorUid}`);
         }
+        console.log('[WEBHOOK SERVICE] ✓ Vendor ID found:', vendorId);
 
         const entry = payload.entry?.[0];
         const changes = entry?.changes?.[0];
         const field = changes?.field;
+        
+        console.log('[WEBHOOK SERVICE] Webhook field:', field);
 
         // Route to appropriate handler
         switch (field) {
             case 'messages':
+                console.log('[WEBHOOK SERVICE] Routing to handleMessageWebhook...');
                 return await this.handleMessageWebhook(vendorId, changes);
             case 'message_template_status_update':
+                console.log('[WEBHOOK SERVICE] Routing to handleTemplateStatusUpdate...');
                 return await this.handleTemplateStatusUpdate(vendorId, changes);
             case 'account_update':
+                console.log('[WEBHOOK SERVICE] Routing to handleAccountUpdate...');
                 return await this.handleAccountUpdate(vendorId, changes);
             default:
+                console.warn('[WEBHOOK SERVICE] ✗ Unknown webhook field:', field);
                 logger.warn(`Unknown webhook field: ${field}`);
                 return { processed: false };
         }
     }
 
     async handleMessageWebhook(vendorId, changes) {
+        console.log('[WEBHOOK SERVICE] handleMessageWebhook called');
         const value = changes.value;
         const phoneNumberId = value.metadata?.phone_number_id;
+        console.log('[WEBHOOK SERVICE] phoneNumberId:', phoneNumberId);
         
         // Handle message statuses (sent, delivered, read)
         if (value.statuses) {
+            console.log('[WEBHOOK SERVICE] Processing message status update...');
             return await this.handleMessageStatus(vendorId, phoneNumberId, value.statuses[0]);
         }
         
         // Handle incoming messages
         if (value.messages) {
+            console.log('[WEBHOOK SERVICE] Processing incoming message...');
             return await this.handleIncomingMessage(vendorId, phoneNumberId, value);
         }
 
+        console.log('[WEBHOOK SERVICE] No status or message found in webhook');
         return { processed: false };
     }
 
     async handleMessageStatus(vendorId, phoneNumberId, status) {
+        console.log('[WEBHOOK SERVICE] handleMessageStatus called');
         const wamid = status.id;
         const messageStatus = status.status;  // sent, delivered, read, failed
         const timestamp = status.timestamp;
         const waId = status.recipient_id;
+        
+        console.log('[WEBHOOK SERVICE] Message status details:', { wamid, messageStatus, waId });
 
         // Update message log
         const [result] = await this.db.execute(
@@ -65,6 +89,8 @@ class WebhookService {
              WHERE wamid = ? AND vendors__id = ?`,
             [messageStatus, timestamp, wamid, vendorId]
         );
+        
+        console.log('[WEBHOOK SERVICE] Message status updated in DB, affected rows:', result.affectedRows);
 
         // If message was sent successfully, delete from queue
         if (messageStatus === 'sent' || messageStatus === 'delivered') {
@@ -75,6 +101,7 @@ class WebhookService {
                  AND status IN (3, 4)`,  // processing or waiting
                 [vendorId, waId]
             );
+            console.log('[WEBHOOK SERVICE] Message removed from queue');
         }
 
         logger.info(`Message status updated: ${wamid} -> ${messageStatus}`);
@@ -82,6 +109,7 @@ class WebhookService {
     }
 
     async handleIncomingMessage(vendorId, phoneNumberId, value) {
+        console.log('[WEBHOOK SERVICE] handleIncomingMessage called');
         const message = value.messages[0];
         const contact = value.contacts[0];
         
@@ -89,19 +117,25 @@ class WebhookService {
         const wamid = message.id;
         const messageType = message.type;
         const timestamp = message.timestamp;
+        
+        console.log('[WEBHOOK SERVICE] Incoming message details:', { waId, wamid, messageType, timestamp });
 
         // Skip welcome and deleted messages (matches PHP logic)
         if (messageType === 'request_welcome') {
+            console.log('[WEBHOOK SERVICE] Skipping welcome message');
             return { processed: false, reason: 'welcome_message' };
         }
 
         // Check for deleted message error (matches PHP)
         if (message.errors && message.errors[0]?.code === 131051) {
+            console.log('[WEBHOOK SERVICE] Skipping deleted message');
             return { processed: false, reason: 'deleted_message' };
         }
 
         // Get or create contact
+        console.log('[WEBHOOK SERVICE] Getting or creating contact...');
         let contactId = await this.getOrCreateContact(vendorId, waId, contact);
+        console.log('[WEBHOOK SERVICE] Contact ID:', contactId);
 
         // Prevent duplicate message creation (matches PHP hasLogEntryOfMessage check)
         const [existingMsg] = await this.db.execute(
@@ -110,6 +144,7 @@ class WebhookService {
         );
 
         if (existingMsg.length > 0) {
+            console.log('[WEBHOOK SERVICE] Duplicate message skipped:', wamid);
             logger.info(`Duplicate message skipped: ${wamid}`);
             return { processed: false, reason: 'duplicate_message' };
         }

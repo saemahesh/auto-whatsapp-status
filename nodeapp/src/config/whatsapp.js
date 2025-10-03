@@ -1,6 +1,6 @@
 const axios = require('axios');
 const db = require('./database');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 class WhatsAppAPI {
     constructor() {
