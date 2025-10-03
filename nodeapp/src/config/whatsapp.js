@@ -39,10 +39,11 @@ class WhatsAppAPI {
 
         try {
             // Fetch vendor configuration from vendor_settings table (like PHP)
+            // NOTE: Removed status filter to match PHP behavior - PHP doesn't filter by status
             const [settings] = await db.execute(
                 `SELECT name, value 
                 FROM vendor_settings 
-                WHERE vendors__id = ? AND status = 1 
+                WHERE vendors__id = ? 
                 AND name IN ('whatsapp_access_token', 'current_phone_number_id', 'whatsapp_business_account_id', 'current_phone_number_number')`,
                 [vendorId]
             );
