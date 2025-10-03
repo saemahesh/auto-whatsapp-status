@@ -34,6 +34,7 @@ app.use((req, res, next) => {
 const webhookRoutes = require('./routes/webhook');
 const campaignRoutes = require('./routes/campaign');
 const healthRoutes = require('./routes/health');
+const debugRoutes = require('./routes/debug');
 
 // Simple test endpoint
 app.get('/test', (req, res) => {
@@ -48,6 +49,7 @@ app.get('/test', (req, res) => {
 app.use('/webhook', webhookRoutes);
 app.use('/campaign', campaignRoutes);
 app.use('/health', healthRoutes);
+app.use('/debug', debugRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {

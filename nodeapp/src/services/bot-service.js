@@ -100,6 +100,8 @@ class BotService {
 
     async checkAndReply(vendorId, contactId, waId, messageBody, options = {}) {
         try {
+            const { phoneNumberId } = options;
+            
             // Check if vendor has active plan (matches PHP logic at line 2655-2658)
             const hasActivePlan = await this.checkVendorActivePlan(vendorId);
             if (!hasActivePlan) {
@@ -141,7 +143,7 @@ class BotService {
 
             if (matchedBot) {
                 logger.info(`Bot matched: ${matchedBot._id} for message: ${messageBody}`);
-                await this.sendBotReply(vendorId, contactId, waId, matchedBot, contact);
+                await this.sendBotReply(vendorId, contactId, waId, matchedBot, contact, phoneNumberId);
                 return { matched: true, botId: matchedBot._id };
             }
 
@@ -241,7 +243,9 @@ class BotService {
         const cached = await this.redis.get(cacheKey);
         
         if (cached) {
-            return JSON.parse(cached);
+            const bots = JSON.parse(cached);
+            logger.debug(`Loaded ${bots.length} bots from cache for vendor ${vendorId}`);
+            return bots;
         }
 
         // Fetch from database
@@ -252,6 +256,8 @@ class BotService {
              ORDER BY priority_index ASC`,
             [vendorId]
         );
+
+        logger.info(`Loaded ${rows.length} active bots from database for vendor ${vendorId}`);
 
         const bots = rows.map(row => {
             let parsedData = {};
@@ -281,6 +287,8 @@ class BotService {
                 .map(t => t.trim().toLowerCase())
                 .filter(Boolean);
 
+            logger.debug(`Bot ${row._id}: trigger_type=${row.trigger_type}, triggers=[${triggers.join(', ')}]`);
+
             return {
                 ...row,
                 __data: parsedData,
@@ -291,16 +299,33 @@ class BotService {
         // Cache for 30 minutes
         await this.redis.setex(cacheKey, 1800, JSON.stringify(bots));
         
+        logger.info(`Cached ${bots.length} bots for vendor ${vendorId}`);
+        
         return bots;
     }
 
     async findMatchingBot(messageBody, bots, isFirstMessage, timingEnabled, timingInTime, contact) {
+        logger.info(`Finding bot match for message: "${messageBody}"`, {
+            botsCount: bots.length,
+            isFirstMessage,
+            timingEnabled,
+            timingInTime
+        });
+
         for (const bot of bots) {
+            logger.debug(`Checking bot ${bot._id}`, {
+                botId: bot._id,
+                triggerType: bot.trigger_type,
+                triggers: bot.triggers,
+                priorityIndex: bot.priority_index
+            });
+
             // Check timing restrictions for this bot type (matches PHP logic at line 2688-2690)
             if (timingEnabled && !timingInTime) {
                 // Skip bots that have timing restrictions
                 // Note: PHP has enable_selected_other_bot_timing_restrictions - we simplify here
                 if (bot.trigger_type !== 'welcome') {
+                    logger.debug(`Skipping bot ${bot._id} due to timing restrictions`);
                     continue;
                 }
             }
@@ -308,13 +333,16 @@ class BotService {
             // Handle welcome bot (matches PHP logic at line 2750-2753)
             if (bot.trigger_type === 'welcome') {
                 if (!isFirstMessage) {
+                    logger.debug(`Skipping welcome bot ${bot._id} - not first message`);
                     continue; // Skip welcome bot if not first message
                 }
+                logger.info(`Welcome bot ${bot._id} matched!`);
                 return bot; // Welcome bot matches on first message
             }
 
             // Handle special triggers (matches PHP logic at line 2754-2809)
             for (const trigger of bot.triggers) {
+                logger.debug(`Testing trigger "${trigger}" (type: ${bot.trigger_type})`);
                 let matched = false;
 
                 // Special trigger: start_promotional (matches PHP line 2754-2764)
@@ -388,11 +416,15 @@ class BotService {
                 }
 
                 if (matched) {
+                    logger.info(`✓ Bot ${bot._id} matched! Trigger: "${trigger}" (type: ${bot.trigger_type})`);
                     return bot;
+                } else {
+                    logger.debug(`✗ No match for trigger "${trigger}" against message "${messageBody}"`);
                 }
             }
         }
 
+        logger.info(`No bot matched for message: "${messageBody}"`);
         return null;
     }
 
@@ -400,7 +432,7 @@ class BotService {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    async sendBotReply(vendorId, contactId, waId, bot, contact) {
+    async sendBotReply(vendorId, contactId, waId, bot, contact, phoneNumberId) {
         try {
             // Get message data from __data field (matches PHP)
             const interactionMessageData = bot.__data?.interaction_message || null;

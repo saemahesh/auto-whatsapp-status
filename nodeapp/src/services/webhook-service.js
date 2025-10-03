@@ -410,7 +410,7 @@ class WebhookService {
 
         // Process bot reply only for text-based messages (matches PHP logic)
         if (messageBody && ['text', 'interactive', 'button'].includes(messageType)) {
-            await this.botService.checkAndReply(vendorId, contactId, waId, messageBody);
+            await this.botService.checkAndReply(vendorId, contactId, waId, messageBody, { phoneNumberId });
         }
 
         logger.info(`Incoming message stored: ${wamid} from ${waId}, type: ${messageType}`);
