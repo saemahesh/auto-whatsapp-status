@@ -65,17 +65,9 @@ class WebhookService {
      */
     async checkVendorActivePlan(vendorId) {
         try {
-            const [rows] = await this.db.execute(
-                `SELECT _id FROM subscriptions 
-                 WHERE vendors__id = ? 
-                 AND status = 1
-                 AND (ends_at IS NULL OR ends_at > NOW())
-                 LIMIT 1`,
-                [vendorId]
-            );
-            return rows.length > 0;
+            return await this.botService.checkVendorActivePlan(vendorId);
         } catch (error) {
-            logger.error('Error checking vendor plan:', error);
+            logger.error('Error checking vendor plan in webhook service:', error);
             return true; // Default to true to avoid blocking
         }
     }

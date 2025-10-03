@@ -159,15 +159,55 @@ class BotService {
      */
     async checkVendorActivePlan(vendorId) {
         try {
-            const [rows] = await this.db.execute(
-                `SELECT _id FROM subscriptions 
-                 WHERE vendors__id = ? 
-                 AND status = 1
-                 AND (ends_at IS NULL OR ends_at > NOW())
-                 LIMIT 1`,
+            const now = new Date();
+
+            const [subscriptionRows] = await this.db.execute(
+                `SELECT id, stripe_status, trial_ends_at, ends_at
+                 FROM subscriptions
+                 WHERE vendor_model__id = ?
+                 LIMIT 5`,
                 [vendorId]
             );
-            return rows.length > 0;
+
+            const hasStripeSubscription = subscriptionRows.some((row) => {
+                const status = (row.stripe_status || '').toLowerCase();
+                const endsAt = row.ends_at ? new Date(row.ends_at) : null;
+                const trialEndsAt = row.trial_ends_at ? new Date(row.trial_ends_at) : null;
+
+                if (status === 'active') {
+                    return !endsAt || endsAt > now;
+                }
+
+                if (status === 'trialing') {
+                    return !trialEndsAt || trialEndsAt > now;
+                }
+
+                if (status === 'past_due') {
+                    return !endsAt || endsAt > now;
+                }
+
+                return false;
+            });
+
+            if (hasStripeSubscription) {
+                return true;
+            }
+
+            const [manualRows] = await this.db.execute(
+                `SELECT _id, ends_at
+                 FROM manual_subscriptions
+                 WHERE vendors__id = ?
+                 AND status = 'active'
+                 LIMIT 5`,
+                [vendorId]
+            );
+
+            const hasManualSubscription = manualRows.some((row) => {
+                const endsAt = row.ends_at ? new Date(row.ends_at) : null;
+                return !endsAt || endsAt > now;
+            });
+
+            return hasManualSubscription;
         } catch (error) {
             logger.error('Error checking vendor plan:', error);
             return true; // Default to true to avoid blocking
@@ -213,11 +253,40 @@ class BotService {
             [vendorId]
         );
 
-        const bots = rows.map(row => ({
-            ...row,
-            __data: JSON.parse(row.__data || '{}'),
-            triggers: row.reply_trigger.split(',').map(t => t.trim().toLowerCase())
-        }));
+        const bots = rows.map(row => {
+            let parsedData = {};
+            const rawData = row.__data;
+
+            if (rawData) {
+                try {
+                    if (typeof rawData === 'string') {
+                        parsedData = JSON.parse(rawData);
+                    } else if (Buffer.isBuffer(rawData)) {
+                        parsedData = JSON.parse(rawData.toString('utf8'));
+                    } else if (typeof rawData === 'object') {
+                        parsedData = rawData;
+                    }
+                } catch (error) {
+                    logger.warn('Failed to parse bot __data JSON, using empty object', {
+                        vendorId,
+                        botId: row._id,
+                        error: error.message
+                    });
+                    parsedData = {};
+                }
+            }
+
+            const triggers = (row.reply_trigger || '')
+                .split(',')
+                .map(t => t.trim().toLowerCase())
+                .filter(Boolean);
+
+            return {
+                ...row,
+                __data: parsedData,
+                triggers
+            };
+        });
 
         // Cache for 30 minutes
         await this.redis.setex(cacheKey, 1800, JSON.stringify(bots));
