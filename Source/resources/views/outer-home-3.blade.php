@@ -868,7 +868,7 @@
                     <h5 class="accordion-header" id="headingOne">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                             data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-                            {{ __tr(' How do I sign up for __appName__?', [
+                            {{ __tr('How do I sign up for __appName__?', [
                                 '__appName__' => $appName,
                             ]) }}
                         </button>

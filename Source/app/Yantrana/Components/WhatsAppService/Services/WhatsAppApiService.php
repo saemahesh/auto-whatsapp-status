@@ -1,8 +1,27 @@
 <?php
 /**
-* WhatsAppApiService.php -
-*
-*-----------------------------------------------------------------------------*/
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+
+/**
+ * WhatsAppApiService.php -
+ *
+ *-----------------------------------------------------------------------------*/
 
 namespace App\Yantrana\Components\WhatsAppService\Services;
 
@@ -12,10 +31,11 @@ use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInterface
 {
-    protected $baseApiRequestEndpoint = 'https://graph.facebook.com/v22.0/'; // Base Request endpoint
+    protected $baseApiRequestEndpoint = 'https://graph.facebook.com/v23.0/'; // Base Request endpoint
 
     protected $waAccountId; // WhatsApp Business Account ID
     protected $whatsAppPhoneNumberId; // Phone number ID
@@ -28,9 +48,7 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
      *
      * @return void
      *-----------------------------------------------------------------------*/
-    public function __construct(
-    ) {
-    }
+    public function __construct() {}
 
     /**
      * Configure settings based on vendor id
@@ -120,9 +138,67 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
                 'language' => [
                     'code' => $whatsAppTemplateLanguage,
                 ],
-                'components' => $components,
+                'components' => $this->cleanMediaLinks($components),
             ],
         ]);
+    }
+
+    private function cleanMediaLinks(array $data): array
+    {
+        $mediaTypes = ['image', 'video', 'document'];
+        $isCarouselTemplate = data_get($data, '1.type'); // carousel
+
+        if ($isCarouselTemplate == 'carousel') {
+            $data = $this->cleanCarouselMediaLink($data);
+        } else {
+            foreach ($data as &$item) {
+                if (!isset($item['parameters']) || !is_array($item['parameters'])) {
+                    continue;
+                }
+
+                foreach ($item['parameters'] as &$param) {
+                    foreach ($mediaTypes as $type) {
+                        if (isset($param[$type]) and is_array($param[$type])) {
+                            if (isset($param[$type]['id']) and !empty($param[$type]['id'])) {
+                                unset($param[$type]['link']);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Send Template Message
+     *
+     * @param  array  $whatsAppTemplate
+     * @param  int  $toNumber
+     * @param  array  $components
+     *
+     * @link https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates
+     *
+     * @return object
+     */
+    private function cleanCarouselMediaLink($array)
+    {
+        $collection = collect($array)->map(function ($item) {
+            if ($item instanceof Collection) {
+                return $this->cleanCarouselMediaLink($item->toArray());
+            }
+
+            if (is_array($item)) {
+                return $this->cleanCarouselMediaLink($item);
+            }
+
+            return $item;
+        })->reject(function ($value, $key) {
+            return $key === 'link';
+        });
+
+        return $collection->toArray();
     }
     /**
      * Send Template Message
@@ -150,7 +226,7 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
                 'language' => [
                     'code' => $whatsAppTemplateLanguage,
                 ],
-                'components' => $components,
+                'components' => $this->cleanMediaLinks($components),
             ],
         ]);
     }
@@ -215,8 +291,7 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
             'header_text' => '',
             'body_text' => '',
             'footer_text' => '',
-            'buttons' => [
-            ],
+            'buttons' => [],
             'cta_url' => null,
             'action' => null,
             'list_data' => null,
@@ -312,14 +387,21 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
      *
      * @return array
      */
-    public function sendMediaMessage($toNumber, string $type, string $mediaLink, $caption = '', $filename = '', $vendorId = null)
+    public function sendMediaMessage($toNumber, string $type, string|array $mediaLink, $caption = '', $filename = '', $vendorId = null)
     {
         if ($vendorId) {
             $this->vendorId = $vendorId;
         }
-        $typeDetails = [
-            'link' => $mediaLink,
-        ];
+        $typeDetails = [];
+        if (is_array($mediaLink)) {
+            if (isset($mediaLink['id'])) {
+                $typeDetails['id'] = $mediaLink['id'];
+            } else {
+                $typeDetails['link'] = $mediaLink['link'];
+            }
+        } else {
+            $typeDetails['link'] = $mediaLink;
+        }
         // if not audio or sticker
         if (! in_array($type, [
             'audio',
@@ -387,13 +469,13 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
     public function phoneNumbers()
     {
         $phoneNumbers = $this->apiGetRequest("{$this->getServiceConfiguration('whatsapp_business_account_id')}/phone_numbers?fields=display_phone_number,certificate,name_status,new_certificate,new_name_status,last_onboarded_time", []);
-        if(!empty($phoneNumbers['data'] ?? [])) {
+        if (!empty($phoneNumbers['data'] ?? [])) {
             foreach ($phoneNumbers['data'] as $phoneNumber) {
-               $this->apiPostRequest($phoneNumber['id'], [
-                    'webhook_configuration' =>[
+                $this->apiPostRequest($phoneNumber['id'], [
+                    'webhook_configuration' => [
                         'override_callback_uri' => ''
                     ]
-               ]);
+                ]);
             }
         }
         return $phoneNumbers;
@@ -423,6 +505,63 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
     {
         return $this->apiPostRequest("{$whatsAppPhoneNumberId}/whatsapp_business_profile", $updateData);
     }
+
+    /**
+     * Get Display Name
+     *
+     * @link https://developers.facebook.com/docs/whatsapp/cloud-api/phone-numbers/#getting-display-name-and-display-name-status-via-api
+     *
+     * @return array
+     */
+    public function displayName($whatsAppPhoneNumberId)
+    {
+        return $this->apiGetRequest("{$whatsAppPhoneNumberId}", [
+            'fields' => 'verified_name,name_status'
+        ]);
+    }
+
+    /**
+     * Get New Display Name
+     *
+     * @link https://developers.facebook.com/docs/whatsapp/cloud-api/phone-numbers/#getting-display-name-and-display-name-status-via-api
+     *
+     * @return array
+     */
+    public function newDisplayName($whatsAppPhoneNumberId)
+    {
+        return $this->apiGetRequest("{$whatsAppPhoneNumberId}", [
+            'fields' => 'new_display_name,name_status'
+        ]);
+    }
+
+    /**
+     * Update Display Name
+     *
+     * @link https://developers.facebook.com/docs/whatsapp/cloud-api/phone-numbers/#updating-display-name-via-api
+     * 
+     * @param obj $request
+     * @return response
+     */
+    public function updateDisplayName($request)
+    {
+        return $this->apiPostRequest("{$request->phoneNumberId}", [
+            'new_display_name' => $request->verified_name
+        ]);
+    }
+
+    /**
+     * Register Phone Number
+     *
+     * @link https://developers.facebook.com/docs/whatsapp/solution-providers/phone-numbers/registering-phone-numbers/#step-4--register-the-number
+     * 
+     * @param obj $request
+     * @return response // 
+     */
+    public function registerPhoneNumber($whatsAppPhoneNumberId, $updateData)
+    {
+        return $this->apiPostRequest("{$whatsAppPhoneNumberId}/register", $updateData);
+    }
+
     /**
      * Update Business Profile request
      *
@@ -454,7 +593,9 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
                     return new Exception(__tr('For the url based media type is required'), 400);
                 }
             } else {
-                $mimeType = mime_content_type($file);
+                if(!$mimeType) {
+                    $mimeType = mime_content_type($file);
+                }
             }
             $ch = curl_init();
             $url = $this->baseApiRequestEndpoint . $this->getServiceConfiguration('current_phone_number_id') . '/media';
@@ -479,13 +620,13 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
                 if ($resultDecode) {
                     $result = $resultDecode;
                     if (! isset($result['error'])) {
-                        return $result;
+                        return $result['id'] ?? null;
                     } else {
                         return new Exception($result['error']['message'], $result['error']['code'] ? $result['error']['code'] : 500);
                     }
                 }
 
-                return $result;
+                return $result['id'] ?? null;
             }
             curl_close($ch);
         } catch (Exception $e) {
@@ -522,7 +663,7 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
                 $data = [
                     'file' => new \CURLFile($file, $mimeType),
                     'type' => $mimeType,
-                   ];
+                ];
             }
             $headers = [];
             $headers[] = 'Authorization: OAuth ' . $this->getServiceConfiguration('whatsapp_access_token');
@@ -641,20 +782,21 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
             $getContents = $response->getBody()->getContents();
             $getContentsDecoded = json_decode($getContents, true);
             $userMessage = Arr::get($getContentsDecoded, 'error.error_user_title', '') . ' '
-            . Arr::get($getContentsDecoded, 'error.message', '') . ' '
-            . Arr::get($getContentsDecoded, 'error.error_user_msg', '') . ' '
-            . Arr::get($getContentsDecoded, 'error.error_data.details');
+                . Arr::get($getContentsDecoded, 'error.message', '') . ' '
+                . Arr::get($getContentsDecoded, 'error.error_user_msg', '') . ' '
+                . Arr::get($getContentsDecoded, 'error.error_data.details');
             if (!$userMessage) {
                 $userMessage = $e->getMessage();
             }
             // __logDebug($userMessage);
             // set notification as your key is token expired
-            if (Str::contains($e->getMessage(), 'Session has expired') and !getVendorSettings(
-                'whatsapp_access_token_expired',
-                null,
-                null,
-                $this->vendorId ?? getVendorId()
-            )
+            if (
+                Str::contains($e->getMessage(), 'Session has expired') and !getVendorSettings(
+                    'whatsapp_access_token_expired',
+                    null,
+                    null,
+                    $this->vendorId ?? getVendorId()
+                )
             ) {
                 setVendorSettings(
                     'internals',
@@ -718,6 +860,47 @@ class WhatsAppApiService extends BaseEngine implements WhatsAppServiceEngineInte
         return $this->apiPostRequest("$whatsAppTemplateId", [
             'name' => $whatsAppTemplateName,
             'components' => $components,
+        ]);
+    }
+
+    /**
+     * Block Contact
+     *
+     * @param int $whatsAppTemplateId
+     * @param array $components
+     * @param int $vendorId
+     * @link https://developers.facebook.com/docs/graph-api/reference/whats-app-business-hsm/#Updating
+     * @return json
+     */
+    public function blockContact($phoneNumber)
+    {
+        return $this->apiPostRequest("{$this->getServiceConfiguration('current_phone_number_id')}/block_users", [
+            "block_users" => [
+                [
+                    "user" => $phoneNumber
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * Unblock Contact
+     *
+     * @param int $whatsAppTemplateId
+     * @param array $components
+     * @param int $vendorId
+     * @link https://developers.facebook.com/docs/graph-api/reference/whats-app-business-hsm/#Updating
+     * @return json
+     */
+    public function unBlockContact($phoneNumber)
+    {
+        return $this->apiDeleteRequest("{$this->getServiceConfiguration('current_phone_number_id')}/block_users", [
+            "messaging_product" => "whatsapp",
+            "block_users" => [
+                [
+                    "user" => $phoneNumber
+                ]
+            ]
         ]);
     }
 }

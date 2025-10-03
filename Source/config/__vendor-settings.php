@@ -20,6 +20,7 @@ return [
         'whatsapp_health_status_data',
         'whatsapp_phone_numbers',
         'whatsapp_onboarding_raw_data',
+        'contacts_import_process_data',
     ],
 
     /* Configuration Setting Items
@@ -236,6 +237,11 @@ return [
                 'data_type' => 2,    // boolean
                 'default' => false,
             ],
+            'use_existing_chat_history' => [
+                'key' => 'use_existing_chat_history',
+                'data_type' => 2,    // boolean
+                'default' => false,
+            ],
             'open_ai_access_key' => [
                 'key' => 'open_ai_access_key',
                 'data_type' => 1,    // string
@@ -253,7 +259,7 @@ return [
                 'data_type' => 1,    // string
                 'default' => '',
                 'hide_value' => false,
-                'ignore_empty' => true,
+                'ignore_empty' => false,
                 'validation_rules' => [
                 //    'alpha_dash',
                 //    'required',
@@ -551,6 +557,13 @@ return [
                 'ignore_empty' => true,
                 'validation_rules' => [
                 ],
+            ],
+            'contacts_import_process_data' => [
+                'key'           => 'contacts_import_process_data',
+                'data_type'     => 4,    // json,
+                'placeholder'   => '',
+                'default'       => '',
+                'ignore_empty' => false
             ],
         ],
     ],

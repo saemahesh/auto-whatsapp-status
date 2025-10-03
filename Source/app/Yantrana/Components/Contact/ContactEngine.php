@@ -1,26 +1,48 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
-* ContactEngine.php - Main component file
-*
-* This file is part of the Contact component.
-*-----------------------------------------------------------------------------*/
+ * ContactEngine.php - Main component file
+ *
+ * This file is part of the Contact component.
+ *-----------------------------------------------------------------------------*/
 
 namespace App\Yantrana\Components\Contact;
 
 use XLSXWriter;
+use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use App\Yantrana\Base\BaseEngine;
+use Illuminate\Support\Facades\DB;
 use Box\Spout\Reader\Common\Creator\ReaderEntityFactory;
 use App\Yantrana\Components\User\Repositories\UserRepository;
 use App\Yantrana\Support\Country\Repositories\CountryRepository;
 use App\Yantrana\Components\Contact\Repositories\LabelRepository;
+use App\Yantrana\Components\WhatsAppService\WhatsAppServiceEngine;
 use App\Yantrana\Components\Contact\Repositories\ContactRepository;
 use App\Yantrana\Components\Contact\Interfaces\ContactEngineInterface;
 use App\Yantrana\Components\Contact\Repositories\ContactGroupRepository;
 use App\Yantrana\Components\Contact\Repositories\ContactLabelRepository;
 use App\Yantrana\Components\Contact\Repositories\GroupContactRepository;
+use App\Yantrana\Components\WhatsAppService\Services\WhatsAppApiService;
 use App\Yantrana\Components\Contact\Repositories\ContactCustomFieldRepository;
 
 class ContactEngine extends BaseEngine implements ContactEngineInterface
@@ -58,6 +80,16 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
     protected $contactLabelRepository;
 
     /**
+     * @var WhatsAppApiService - WhatsApp API Service
+     */
+    protected $whatsAppApiService;
+
+    /**
+     * @var WhatsAppServiceEngine - WhatsAppService Engine
+     */
+    protected $whatsAppServiceEngine;
+
+    /**
      * Constructor
      *
      * @param  ContactRepository  $contactRepository  - Contact Repository
@@ -67,6 +99,7 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
      * @param  UserRepository  $userRepository  - User Fields Repository
      * @param  LabelRepository  $labelRepository  - Labels Repository
      * @param  ContactLabelRepository  $contactLabelRepository  - Contact Labels Repository
+     * @param  WhatsAppApiService  $whatsAppApiService  - WhatsApp API Service
      *
      * @return void
      *-----------------------------------------------------------------------*/
@@ -78,6 +111,8 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         UserRepository $userRepository,
         LabelRepository $labelRepository,
         ContactLabelRepository $contactLabelRepository,
+        WhatsAppApiService $whatsAppApiService,
+        WhatsAppServiceEngine $whatsAppServiceEngine
     ) {
         $this->contactRepository = $contactRepository;
         $this->contactGroupRepository = $contactGroupRepository;
@@ -86,6 +121,8 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         $this->userRepository = $userRepository;
         $this->labelRepository = $labelRepository;
         $this->contactLabelRepository = $contactLabelRepository;
+        $this->whatsAppApiService = $whatsAppApiService;
+        $this->whatsAppServiceEngine = $whatsAppServiceEngine;
     }
 
     /**
@@ -105,12 +142,13 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
             ]);
             if (!__isEmpty($contactGroup)) {
                 $groupContacts = $this->groupContactRepository->fetchItAll([
-                    'contact_groups__id' => $contactGroup->_id
+                    'contact_groups__id' => $contactGroup->_id,
                 ]);
                 $groupContactIds = $groupContacts->pluck('contacts__id')->toArray();
             }
         }
         $contactCollection = $this->contactRepository->fetchContactDataTableSource($groupContactIds, $contactGroupUid);
+        // __dd($contactCollection);
         $listOfCountries = getCountryPhoneCodes();
         // required columns for DataTables
         $requireColumns = [
@@ -131,13 +169,19 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
             'phone_number' => function ($rowData) {
                 return $rowData['wa_id'];
             },
+            'is_direct_message_delivery_window_opened' => function ($rowData) {
+                return (! __isEmpty($rowData['last_incoming_message']) and (Carbon::parse(data_get($rowData, 'last_incoming_message.messaged_at'))->diffInHours() < 24));
+            },
             'email',
+            'is_blocked' => function ($rowData) {
+                return (!__isEmpty($rowData['wa_blocked_at']));
+            },
             'created_at' => function ($rowData) {
                 return formatDateTime($rowData['created_at']);
             },
             'groups' => function ($rowData) {
                 // Extract 'title' from each group using array_column
-                $titles = array_column($rowData['groups'], 'title');
+                $titles = array_unique(array_column($rowData['groups'], 'title'));
                 // Return all titles as a comma-separated string, or 'No Groups' if empty
                 return !__isEmpty($titles) ? implode(', ', $titles) : '-';
             },
@@ -215,7 +259,7 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         $message = '';
         // check for test number
         if (in_array(getVendorSettings('test_recipient_contact'), $selectedContactUids)) {
-            $message .= __tr(' However one of these contact is set as Test Contact, which can not be deleted.');
+            $message .= __tr('However one of these contact is set as Test Contact, which can not be deleted.');
             if (($key = array_search(getVendorSettings('test_recipient_contact'), $selectedContactUids)) !== false) {
                 unset($selectedContactUids[$key]);
             }
@@ -235,6 +279,27 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         }
         // if failed to delete
         return $this->engineFailedResponse([], __tr('Failed to delete Contacts'));
+    }
+
+    /**
+     * Process Delete All Contact
+     *
+     * @param  BaseRequest  $request
+     *
+     * @return array
+     *---------------------------------------------------------------- */
+    public function processDeleteAllContact()
+    {
+        $testContactUid = getVendorSettings('test_recipient_contact');
+        // Delete All Contacts except test contact
+        if ($this->contactRepository->deleteAllContact(getVendorId(), $testContactUid)) {
+            // if successful
+            return $this->engineSuccessResponse([
+                'reloadDatatableId' => '#lwContactList'
+            ], __tr('All Contacts deleted successfully.'));
+        }
+        // if failed to delete
+        return $this->engineFailedResponse([], __tr('Nothing to delete.'));
     }
 
     /**
@@ -476,8 +541,7 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
             return $this->engineResponse(18, null, __tr('Contact not found.'));
         }
         $contactIdOrUid = $contact->_uid;
-        $updateData = [
-        ];
+        $updateData = [];
         if (isExternalApiRequest()) {
             if (array_key_exists('enable_ai_bot', $inputData)) {
                 $updateData['disable_ai_bot'] = $inputData['enable_ai_bot'] ? 0 : 1;
@@ -489,6 +553,7 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
             $updateData = [
                 'whatsapp_opt_out' => (array_key_exists('whatsapp_opt_out', $inputData) and $inputData['whatsapp_opt_out']) ? 1 : null,
                 'disable_ai_bot' => (array_key_exists('enable_ai_bot', $inputData) and $inputData['enable_ai_bot']) ? 0 : 1,
+                'disable_reply_bot' => (array_key_exists('enable_reply_bot', $inputData) and $inputData['enable_reply_bot']) ? 0 : 1,
             ];
         }
         if (array_key_exists('first_name', $inputData)) {
@@ -738,12 +803,16 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
             $countryRepository = new CountryRepository();
             $countries = $countryRepository->fetchItAll([
                 [
-                    'phone_code', '!=', 0
+                    'phone_code',
+                    '!=',
+                    0
                 ],
                 [
-                    'phone_code', '!=', null
+                    'phone_code',
+                    '!=',
+                    null
                 ],
-            ], ['_id','name'])->keyBy('_id')->toArray();
+            ], ['_id', 'name'])->keyBy('_id')->toArray();
             // contacts
             $this->contactRepository->getAllContactsForTheVendorLazily($vendorId, function (object $contact) use (&$countries, &$writer) {
                 $dataItem = [
@@ -786,317 +855,495 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         ])->deleteFileAfterSend();
     }
 
+    public function processExportCSVContacts($exportType = 'blank')
+    {
+        $vendorId = getVendorId();
+
+        $header = [
+            'First Name',
+            'Last Name',
+            'Mobile Number',
+            'Language Code',
+            'Country',
+            'Email',
+            'Groups',
+        ];
+
+        // Required data like fields and groups
+        $contactsRequiredData = $this->prepareContactRequiredData();
+
+        // Custom fields
+        $vendorContactCustomFields = $contactsRequiredData->data('vendorContactCustomFields');
+        foreach ($vendorContactCustomFields as $customField) {
+            $header[] = $customField->input_name;
+        }
+
+        // Temp CSV path
+        $tempFile = tempnam(sys_get_temp_dir(), "exported_contacts_{$vendorId}.csv");
+        $fp = fopen($tempFile, 'w');
+
+        // Write header row
+        fputcsv($fp, $header);
+
+        if ($exportType === 'data') {
+            if (isDemo() && isDemoVendorAccount()) {
+                abort(403, __tr('Exporting Contacts data has been disabled for demo'));
+            }
+
+            $countryRepository = new CountryRepository();
+            $countries = $countryRepository->fetchItAll([
+                ['phone_code', '!=', 0],
+                ['phone_code', '!=', null],
+            ], ['_id', 'name'])->keyBy('_id')->toArray();
+
+            // Stream contact rows
+            $this->contactRepository->getAllContactsForTheVendorLazily($vendorId, function (object $contact) use (&$countries, $fp) {
+                $row = [
+                    $contact->first_name,
+                    $contact->last_name,
+                    $contact->wa_id,
+                    $contact->language_code,
+                    $countries[$contact->countries__id]['name'] ?? '',
+                    $contact->email,
+                ];
+                // groups
+                if ($contact->groups) {
+                    $groupItems = [];
+                    foreach ($contact->groups as $group) {
+                        $groupItems[] = $group->title;
+                    }
+                    $row[] = implode(',', array_unique($groupItems));
+                    unset($groupItems);
+                }
+                // custom fields
+                if ($contact->customFieldValues) {
+                    foreach ($contact->customFieldValues as $customFieldValue) {
+                        $row[] = $customFieldValue->field_value;
+                    }
+                }
+
+                fputcsv($fp, array_map(function ($value) {
+                    // Only wrap long numeric values
+                    return (string) (((is_numeric($value) && strlen($value) >= 11)
+                        ? '="' . $value . '"'
+                        : $value) ?: '');
+                }, $row));
+            });
+        }
+
+        fclose($fp);
+
+        $dateTime = str_slug(now()->format('Y-m-d-H-i-s'));
+
+        return response()->download($tempFile, "contacts-{$exportType}-{$dateTime}.csv", [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Transfer-Encoding' => 'binary',
+        ])->deleteFileAfterSend();
+    }
+
+
     /**
      * Import contacts using Excel sheet
      *
-     * @param BaseRequest $request
+     * @param BaseRequest|string $request OR document name
      * @return EngineResponse
      */
-    public function processImportContacts($request)
+    public function processImportContacts($request, $freshRequest = true)
     {
+        // Initialize database connection with optimizations
+        DB::connection()->disableQueryLog();
+        DB::connection()->unsetEventDispatcher();
+        $existingContactImportRequest = getVendorSettings('contacts_import_process_data');
+        $documentName = $request->get('document_name');
+        $totalRows = 0;
+        if ($existingContactImportRequest) {
+            sleep(1); // wait for a while
+            if ($documentName !== 'existing') {
+                deleteTempUploadedFile($documentName);
+                return $this->engineFailedResponse([], __tr('Existing import contacts request already in progress, please wait until it is completed OR abort it.'));
+            }
+            $documentName = $existingContactImportRequest['document_name'] ?? null;
+            $totalRows = $existingContactImportRequest['total_rows'] ?? 0;
+        }
         $vendorId = getVendorId();
-        // check if vendor has active plan
         $vendorPlanDetails = vendorPlanDetails(null, null, $vendorId);
+
         if (!$vendorPlanDetails->hasActivePlan()) {
             return $this->engineResponse(22, null, $vendorPlanDetails['message']);
         }
-        $filePath = getTempUploadedFile($request->get('document_name'));
+
+        $filePath = getTempUploadedFile($documentName);
+        if (!$filePath or !file_exists($filePath)) {
+            return $this->engineFailedResponse([], __tr('File not found, please upload again.'));
+        }
         $countryRepository = new CountryRepository();
-        $countries = $countryRepository->fetchItAll([], [
-            '_id',
-            'name',
-            'iso_code',
-            'name_capitalized',
-            'iso3_code',
-            'phone_code',
-            ])->keyBy('name')->toArray();
+        $countries = $countryRepository->fetchItAll([], ['_id', 'name', 'iso_code', 'name_capitalized', 'iso3_code', 'phone_code'])->keyBy('name')->toArray();
         $contactsRequiredData = $this->prepareContactRequiredData();
-        $vendorContactGroups = $contactsRequiredData->data('vendorContactGroups')?->keyBy('title')?->toArray() ?: [];
-        $vendorContactCustomFields = $contactsRequiredData->data('vendorContactCustomFields')?->keyBy('input_name')?->toArray() ?: [];
+
+        $vendorContactGroups = $contactsRequiredData->data('vendorContactGroups')?->keyBy('title')->toArray() ?: [];
+        $vendorContactCustomFields = $contactsRequiredData->data('vendorContactCustomFields')?->keyBy('input_name')->toArray() ?: [];
         $duplicateEntries = [];
         $botSettingsForNewContacts = getVendorSettings('default_enable_flowise_ai_bot_for_users', null, null, $vendorId) ? 0 : 1;
-        $reader = ReaderEntityFactory::createReaderFromFile($filePath);
+
+        // $reader = ReaderEntityFactory::createReaderFromFile($filePath);
+        $reader = ReaderEntityFactory::createCSVReader();
         $reader->open($filePath);
-        $data = [];
-        $dataStructure = [
-            'first_name',
-            'last_name',
-            'wa_id',
-            'language_code',
-            'countries__id',
-            'email',
-        ];
-        $customFieldStructure = [];
         $contactsToUpdate = [];
         $customFieldsToUpdate = [];
         $contactGroupsToUpdate = [];
-        $vendorAllContactsCount = $this->contactRepository->countIt([
-                'vendors__id' => $vendorId
-            ]);
         $phoneNumbers = [];
-        $ignoreRow = false;
-        $newContactsCount = 0;
-        $numberOfRows = 0;
+        $numbersToProcess = [];
+        $numbersToProcessCount = 0;
+        $customFieldStructure = [];
+        $vendorAllContactsCount = $this->contactRepository->countIt([
+            'vendors__id' => $vendorId,
+        ]);
         $contactsPerRequest = getAppSettings('contacts_import_limit_per_request') ?: 5000;
-        $chuckSize = 500;
+        $chunkSize = 500;
+        $newContactsCount = 0;
+        $processingRows = 0;
+        $dataStructure = ['first_name', 'last_name', 'wa_id', 'language_code', 'countries__id', 'email'];
+        $processedRows = (int) Arr::get($existingContactImportRequest, 'processed_rows', 0);
         try {
-            // loop through the sheets
-            foreach ($reader->getSheetIterator() as $sheet) {
-                // loop though each row
-                foreach ($sheet->getRowIterator() as $rowIndex => $row) {
-                    $numberOfRows++;
-                }
-                // rows limitation
-                if ($numberOfRows > $contactsPerRequest) {
-                    return $this->engineFailedResponse([], __tr('Please upload maximum of __contactsPerRequest__ records in single upload', [
-                        '__contactsPerRequest__' => $contactsPerRequest
-                    ]));
-                }
-                // loop though each row to process data
-                foreach ($sheet->getRowIterator() as $rowIndex => $row) {
-                    if ($ignoreRow) {
-                        $ignoreRow = false;
-                    }
-                    // do stuff with the row
-                    $cells = $row->getCells();
-                    $contact = null;
-                    $contactId = null;
-                    if ($rowIndex != 1) {
-                        $contactsToUpdate[$rowIndex] = [
-                            'first_name' => null,
-                            'last_name' => null,
-                            'language_code' => null,
-                            'countries__id' => null,
-                            'email' => null,
-                            'vendors__id' => $vendorId
-                        ];
-                    }
-                    // loop through each cell of row
-                    foreach ($cells as $cellIndex => $cell) {
-                        if ($ignoreRow) {
+            // just for checks
+            if ($freshRequest) {
+                foreach ($reader->getSheetIterator() as $sheet) {
+                    foreach ($sheet->getRowIterator() as $rowIndex => $row) {
+                        if ($rowIndex === 1) {
                             continue;
                         }
-                        $cellValue = e($cell->getValue());
-                        // if its not header row and upto 5 cells its contact basic fields
-                        if (($rowIndex != 1) and ($cellIndex <= 5)) {
-                            if ($dataStructure[$cellIndex] == 'wa_id') {
-                                if (!$cellValue) {
-                                    return $this->engineFailedResponse([], __tr('Missing phone number on row __rowNumber__ ', [
-                                        '__rowNumber__' => $rowIndex
-                                    ]));
-                                }
-                                // check if mobile number is valid
-                                if (!is_numeric($cellValue)) {
-                                    $ignoreRow = true;
-                                    $duplicateEntries[] = $cellValue;
-                                    unset($contactsToUpdate[$rowIndex]);
-                                    continue;
-                                }
-                                if (str_starts_with($cellValue, '0') or str_starts_with($cellValue, '+')) {
-                                    $cellValue = cleanDisplayPhoneNumber($cellValue);
-                                }
-                                // check if number is already processed then skip and continue
-                                if (in_array($cellValue, $phoneNumbers)) {
-                                    $ignoreRow = true;
-                                    $duplicateEntries[] = $cellValue;
-                                    unset($contactsToUpdate[$rowIndex]);
-                                    continue;
-                                }
-                                $contact = $this->contactRepository->with(['groups', 'customFieldValues'])->fetchIt([
-                                    'vendors__id' => $vendorId,
-                                    'wa_id' => $cellValue,
-                                ], [
-                                    '_id',
-                                    '_uid',
-                                    'wa_id'
-                                    ])?->toArray() ?: [];
-                                $contactsToUpdate[$rowIndex]['_uid'] = Arr::get($contact, '_uid') ?: (string) Str::uuid();
-                                if (!__isEmpty($contact)) {
-                                    $contactId = Arr::get($contact, '_id');
-                                } else {
-                                    $contactsToUpdate[$rowIndex]['disable_ai_bot'] = $botSettingsForNewContacts;
-                                    $newContactsCount++;
-                                    $contactsToUpdate[$rowIndex][$dataStructure[$cellIndex]] = $cellValue;
-                                    $phoneNumbers[] = $cellValue;
-                                }
-                            }
-                            // if its country column
-                            elseif ($dataStructure[$cellIndex] == 'countries__id') {
-                                $getCountry = Arr::first($countries, function ($value, $key) use (&$cellValue) {
-                                    return in_array(strtolower($cellValue), array_map(function ($item) {
-                                        return strtolower($item);
-                                    }, array_values(Arr::only($value, [
-                                        'name',
-                                        'iso_code',
-                                        'name_capitalized',
-                                        'iso3_code',
-                                        'phone_code',
-                                    ])))) == true;
-                                });
-                                $contactsToUpdate[$rowIndex][$dataStructure[$cellIndex]] = Arr::get($getCountry, '_id');
-                            } else {
-                                $contactsToUpdate[$rowIndex][$dataStructure[$cellIndex]] = $cellValue;
-                            }
+                        if (!$existingContactImportRequest) {
+                            $totalRows++;
                         }
-                    }
-                    // store and make memory free
-                    if (count($contactsToUpdate) >= $chuckSize) {
-                        // check the feature limit
-                        $vendorPlanDetails = vendorPlanDetails('contacts', ($vendorAllContactsCount + $newContactsCount), $vendorId);
-                        if (!$vendorPlanDetails['is_limit_available']) {
-                            return $this->engineResponse(22, null, $vendorPlanDetails['message']);
+                        if ($processedRows > $rowIndex) {
+                            continue; // skip already processed rows
                         }
-                        $this->contactRepository->bunchInsertOrUpdate($contactsToUpdate, '_uid');
-                        $contactsToUpdate = [];
-                    }
-                }
-                // if remaining records
-                if (!empty($contactsToUpdate)) {
-                    // check the feature limit
-                    $vendorPlanDetails = vendorPlanDetails('contacts', ($vendorAllContactsCount + $newContactsCount), $vendorId);
-                    if (!$vendorPlanDetails['is_limit_available']) {
-                        return $this->engineResponse(22, null, $vendorPlanDetails['message']);
-                    }
-                    $this->contactRepository->bunchInsertOrUpdate($contactsToUpdate, '_uid');
-                    $contactsToUpdate = [];
-                }
-                $totalContactsProcessed = $newContactsCount;
-                // next procedure to update related to models
-                // loop though each row
-                foreach ($sheet->getRowIterator() as $rowIndex => $row) {
-                    // do stuff with the row
-                    $cells = $row->getCells();
-                    if ($rowIndex != 1) {
-                        $contactsToUpdate[$rowIndex]['vendors__id'] = $vendorId;
-                    }
-                    // loop through each cell of row
-                    foreach ($cells as $cellIndex => $cell) {
-                        $cellValue = e($cell->getValue());
-                        // if its not header row and upto 4 cells its contact basic fields
-                        if (($rowIndex != 1) and ($cellIndex <= 5)) {
-                            if ($dataStructure[$cellIndex] == 'wa_id') {
-                                $contact = $this->contactRepository->with(['groups', 'customFieldValues'])->fetchIt([
-                                    'vendors__id' => $vendorId,
-                                    'wa_id' => $cellValue,
-                                ], [
-                                    '_id',
-                                    '_uid',
-                                    'wa_id'
-                                    ])?->toArray() ?: [];
-                                // check if contact found
-                                if (!__isEmpty($contact)) {
-                                    $contactId = Arr::get($contact, '_id');
-                                } else {
-                                    // collect wa_id which is the phone numbers
-                                    $phoneNumbers[] = $cellValue;
-                                }
-                            }
-                        } elseif (($cellIndex == 6) and ($rowIndex != 1)) { // groups
-                            // get the group names and explode it from comma separated names
-                            $extractedGroups = trim($cellValue) ? explode(',', $cellValue) : [];
-                            $contactGroups = collect($contact['groups'] ?? [])->keyBy('_id');
-                            // loop through the groups
-                            foreach ($extractedGroups as $extractedGroup) {
-                                $extractedGroup = Str::limit(trim($extractedGroup), 250, '');
-                                // get group id
-                                $contactGroupId = Arr::get($vendorContactGroups, $extractedGroup . '._id');
-                                if (!$contactGroupId) {
-                                    // create new group when needed
-                                    if ($newGroupCreate = $this->contactGroupRepository->storeIt([
-                                        'title' => $extractedGroup,
-                                        'vendors__id' => $vendorId,
-                                    ])) {
-                                        $vendorContactGroups[$extractedGroup] = $newGroupCreate->toArray();
-                                        $contactGroupId = $newGroupCreate->_id;
+                        if ($numbersToProcessCount <= ($chunkSize + 5)) {
+                            $cells = $row->getCells();
+                            foreach ($cells as $cellIndex => $cell) {
+                                $cellValue = e($cell->getValue());
+                                $cellValue = trim((string)$cellValue);
+                                if ($cellIndex <= 5) {
+                                    $field = $dataStructure[$cellIndex] ?? null;
+                                    if ($field === 'wa_id') {
+                                        // Remove wrapping like ="123456"
+                                        $cellValue = preg_replace('/^="?([^"]+)"?$/', '$1', $cellValue);
+                                        // Keep only numbers
+                                        $cellValue = preg_replace('/\D/', '', $cellValue);
+                                        if (!$cellValue || !is_numeric($cellValue)) {
+                                            if (!$existingContactImportRequest) {
+                                                $totalRows--;
+                                            }
+                                            continue 2;
+                                        }
+                                        $cellValue = cleanDisplayPhoneNumber($cellValue);
+                                        $numbersToProcess[] = $cellValue;
+                                        $numbersToProcessCount++;
+                                        continue 2; //
                                     }
                                 }
-                                if ($contactId and $contactGroupId and !isset($contactGroups[$contactGroupId])) {
-                                    // set it for update
-                                    $contactGroupsToUpdate[] = [
-                                        'contact_groups__id' => $contactGroupId,
-                                        'contacts__id' => $contactId,
-                                    ];
+                            }
+                        } else if ($existingContactImportRequest) {
+                            break; // stop processing if we reach the limit
+                        }
+                    }
+                    break; // count only first sheet
+                }
+            }
+
+            $vendorAllContacts = $this->contactRepository->with(['groups', 'customFieldValues'])->fetchItAll(
+                $numbersToProcess,
+                ['_id', '_uid', 'wa_id', 'disable_ai_bot'],
+                'wa_id',
+                [
+                    // for this vendor
+                    'where' => [
+                        'vendors__id' => $vendorId,
+                    ]
+                ]
+            )?->keyBy('wa_id')?->toArray() ?: [];
+            if (!$existingContactImportRequest) {
+                if ($totalRows > $contactsPerRequest) {
+                    $reader->close();
+                    return $this->engineFailedResponse([], __tr('Please upload maximum of __contactsPerRequest__ records in single upload', ['__contactsPerRequest__' => $contactsPerRequest]));
+                }
+                if ($totalRows > $vendorAllContactsCount) {
+                    $vendorPlanDetails = vendorPlanDetails('contacts', $totalRows, $vendorId);
+                    if (!$vendorPlanDetails['is_limit_available']) {
+                        $reader->close();
+                        return $this->engineFailedResponse([], $vendorPlanDetails->message());
+                    }
+                }
+                setVendorSettings(
+                    'internals',
+                    [
+                        'contacts_import_process_data' => [
+                            'total_rows' => $totalRows,
+                            'document_name' => $documentName,
+                            'processed_rows' => 0,
+                            'new_contacts_processed' => 0,
+                            'duplicate_entries' => 0,
+                            'progress' => 0,
+                            'started_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    ]
+                );
+                updateClientModels([
+                    // 'progress' => $progressCount,
+                    'existingImportRequestData' => [
+                        'progress' => 0.01,
+                        'estimatedRemainingTime' => 0,
+                        'progressCountFormatted' => __tr(0.01 . '%'),
+                    ]
+                ]);
+                $reader->close();
+                return $this->engineSuccessResponse([
+                    'progressCount' => 0.01,
+                    'estimatedRemainingTime' => 0,
+                    'progressCountFormatted' => __tr(0.01 . '%'),
+                ], __tr('Import is in progress ...'));
+            }
+            // end first checks
+            foreach ($reader->getSheetIterator() as $sheet) {
+                foreach ($sheet->getRowIterator() as $rowIndex => $row) {
+                    $cells = $row->getCells();
+                    if ($rowIndex === 1) {
+                        foreach ($cells as $cellIndex => $cell) {
+                            $customFieldStructure[$cellIndex] = trim((string) e($cell->getValue()));
+                        }
+                        continue;
+                    }
+                    if ($processedRows > $rowIndex) {
+                        continue; // skip already processed rows
+                    }
+
+                    $contactRow = ['vendors__id' => $vendorId];
+                    $waId = null;
+                    $contactId = null;
+                    $contactData = null;
+
+                    foreach ($cells as $cellIndex => $cell) {
+                        $cellValue = e($cell->getValue());
+                        $cellValue = trim((string)$cellValue);
+                        if ($cellIndex <= 5) {
+                            $field = $dataStructure[$cellIndex] ?? null;
+                            if ($field === 'wa_id') {
+                                // Remove wrapping like ="123456"
+                                $cellValue = preg_replace('/^="?([^"]+)"?$/', '$1', $cellValue);
+                                // Keep only numbers
+                                $cellValue = preg_replace('/\D/', '', $cellValue);
+                                if (!$cellValue || !is_numeric($cellValue)) {
+                                    $duplicateEntries[] = $cellValue;
+                                    continue 2;
+                                }
+
+                                $cellValue = cleanDisplayPhoneNumber($cellValue);
+                                if (in_array($cellValue, $phoneNumbers)) {
+                                    $duplicateEntries[] = $cellValue;
+                                    continue 2;
+                                }
+                                $contactData = ($vendorAllContacts[$cellValue] ?? []) ?: [];
+                                $waId = $cellValue;
+                                $contactRow['_uid'] = $contactData['_uid'] ?? (string) Str::uuid();
+                                $contactRow['disable_ai_bot'] = $contactData['disable_ai_bot'] ?? $botSettingsForNewContacts;
+                                if (empty($contactData)) {
+                                    // $contactRow['disable_ai_bot'] = $botSettingsForNewContacts;
+                                    $newContactsCount++;
+                                    $phoneNumbers[] = $cellValue;
+                                } else {
+                                    $contactId = $contactData['_id'];
+                                }
+
+                                $contactRow[$field] = $cellValue;
+                            } elseif ($field === 'countries__id') {
+                                $matchedCountry = Arr::first($countries, function ($value) use ($cellValue) {
+                                    return in_array(strtolower($cellValue), array_map('strtolower', array_values(Arr::only($value, ['name', 'iso_code', 'name_capitalized', 'iso3_code', 'phone_code']))));
+                                });
+                                $contactRow[$field] = $matchedCountry['_id'] ?? null;
+                            } else {
+                                $contactRow[$field] = $cellValue;
+                            }
+                        } elseif ($cellIndex === 6 && $contactId) {
+                            $groups = explode(',', $cellValue);
+                            $existingGroups = collect($contactData['groups'] ?? [])->pluck('_id')->flip();
+
+                            foreach ($groups as $group) {
+                                $group = Str::limit(trim($group), 250, '');
+                                $groupId = $vendorContactGroups[$group]['_id'] ?? null;
+
+                                if (!$groupId and $group) {
+                                    $newGroup = $this->contactGroupRepository->storeIt(['title' => $group, 'vendors__id' => $vendorId]);
+                                    $vendorContactGroups[$group] = $newGroup->toArray();
+                                    $groupId = $newGroup->_id;
+                                }
+
+                                if ($groupId && !$existingGroups->has($groupId)) {
+                                    $contactGroupsToUpdate[] = ['_uid' => (string) Str::uuid(), 'contact_groups__id' => $groupId, 'contacts__id' => $contactId];
                                 }
                             }
-                        } elseif ($cellIndex >= 7) { // custom field
-                            // custom field values
-                            if ($rowIndex == 1) {
-                                $customFieldStructure[$cellIndex] = $cellValue;
-                            } else {
-                                // get custom item field data based on column head
-                                $customFieldItem = $vendorContactCustomFields[$customFieldStructure[ $cellIndex ?? null ]] ?? null;
-                                if ($customFieldItem and $contactId) {
-                                    // extract the item from contact db custom field value
-                                    $customFieldDbItem = Arr::first($contact['custom_field_values'] ?? [], function ($value, $key) use ($customFieldItem) {
-                                        return $value['contact_custom_fields__id'] == Arr::get($customFieldItem, '_id');
-                                    });
-                                    $customFieldsToUpdate[] = [
-                                        // get or set uuid
-                                        '_uid' => Arr::get($customFieldDbItem, '_uid') ?: (string) Str::uuid(),
-                                        'contact_custom_fields__id' => Arr::get($customFieldItem, '_id'),
-                                        'contacts__id' => $contactId,
-                                        'field_value' => $cellValue,
-                                    ];
-                                }
+                        } elseif ($cellIndex >= 7 && $contactId) {
+                            $fieldName = $customFieldStructure[$cellIndex] ?? null;
+                            $customField = $vendorContactCustomFields[$fieldName] ?? null;
+
+                            if ($customField) {
+                                $existingField = Arr::first($contactData['custom_field_values'] ?? [], fn($v) => $v['contact_custom_fields__id'] === $customField['_id']);
+                                $customFieldsToUpdate[] = [
+                                    '_uid' => $existingField['_uid'] ?? (string) Str::uuid(),
+                                    'contact_custom_fields__id' => $customField['_id'],
+                                    'contacts__id' => $contactId,
+                                    'field_value' => $cellValue
+                                ];
                             }
                         }
                     }
+                    $processingRows++;
+                    $contactsToUpdate[] = $contactRow;
+                    if (count($contactsToUpdate) >= $chunkSize) {
+                        $this->flushContactBatch($contactsToUpdate, $customFieldsToUpdate, $contactGroupsToUpdate, $vendorId, $vendorAllContactsCount, $newContactsCount, $freshRequest);
+                        if ($freshRequest) {
+                            $this->processImportContacts($request, false);
+                        }
+                        $progressCount = round(($rowIndex / ($totalRows ?: 1)) * 100, 2);
+                        // Set vendor settings to process contacts import
+                        setVendorSettings(
+                            'internals',
+                            [
+                                'contacts_import_process_data' => [
+                                    'total_rows' => $totalRows,
+                                    'document_name' => $documentName,
+                                    'processed_rows' => $rowIndex,
+                                    'new_contacts_processed' => $newContactsCount,
+                                    'duplicate_entries_count' => count($duplicateEntries),
+                                    'progress' => $progressCount,
+                                    'progressCountFormatted' => __tr($progressCount . '%'),
+                                    'started_at' => $existingContactImportRequest['started_at'] ?? now(),
+                                    'updated_at' => now(),
+                                ]
+                            ]
+                        );
 
-                    // store and make memory free
-                    // create or custom field values
-                    if (count($customFieldsToUpdate) >= $chuckSize) {
-                        $this->contactCustomFieldRepository->storeCustomValues($customFieldsToUpdate, '_uid');
-                        $customFieldsToUpdate = [];
+                        try {
+                            $startTime = Carbon::parse($existingContactImportRequest['started_at'] ?? now()); // Or use Carbon::now() at start
+                            $currentTime = Carbon::parse($existingContactImportRequest['updated_at'] ?? now());
+                            $elapsedSeconds = $currentTime->diffInSeconds($startTime);
+                            $averageTimePerRow = $processedRows > 0 ? $elapsedSeconds / $processedRows : 0;
+                            $remainingRows = $totalRows - $processedRows;
+                            $estimatedRemainingSeconds = $averageTimePerRow * $remainingRows;
+                            // Format estimated time
+                            $estimatedRemainingTime = $estimatedRemainingSeconds ? __tr(Carbon::now()->addSeconds($estimatedRemainingSeconds)->diffForHumans(null, true, false, 3)) : __tr('Calculating...');
+                        } catch (\Throwable $th) {
+                            //throw $th;
+                            $estimatedRemainingTime = __tr('Calculating...');
+                        }
+                        updateClientModels([
+                            'existingImportRequestData' => [
+                                'progress' => $progressCount,
+                                'estimatedRemainingTime' => $estimatedRemainingTime,
+                                'progressCountFormatted' => __tr($progressCount . '%'),
+                            ]
+                        ]);
+                        return $this->engineSuccessResponse([
+                            'progressCount' => $progressCount,
+                            'progressCountFormatted' => __tr($progressCount . '%'),
+                        ]);
                     }
-                    // assign groups update
-                    if (count($contactGroupsToUpdate) >= $chuckSize) {
-                        $this->groupContactRepository->bunchInsertOrUpdate($contactGroupsToUpdate, '_uid');
-                        $contactGroupsToUpdate = [];
-                    }
                 }
-                // store and make memory free
-                // remaining
-                // create or custom field values
-                if (!empty($customFieldsToUpdate)) {
-                    $this->contactCustomFieldRepository->storeCustomValues($customFieldsToUpdate, '_uid');
-                    $customFieldsToUpdate = [];
-                }
-                // assign groups update
-                if (!empty($contactGroupsToUpdate)) {
-                    $this->groupContactRepository->bunchInsertOrUpdate($contactGroupsToUpdate, '_uid');
-                    $contactGroupsToUpdate = [];
-                }
+                break; // count only first sheet
             }
-            // close the sheet
+            // flush remaining contacts
+            $this->flushContactBatch($contactsToUpdate, $customFieldsToUpdate, $contactGroupsToUpdate, $vendorId, $vendorAllContactsCount, $newContactsCount, $freshRequest);
             $reader->close();
-            // create or custom field values
-            /* if(!empty($customFieldsToUpdate)) {
-                foreach (array_chunk($customFieldsToUpdate, 500) as $customFieldsDataChunk) {
-                    $this->contactCustomFieldRepository->storeCustomValues($customFieldsDataChunk, '_uid');
-                }
-            } */
-            // groups update
-            /*  if(!empty($contactGroupsToUpdate)) {
-                 foreach (array_chunk($contactGroupsToUpdate, 500) as $contactGroupsFieldsDataChunk) {
-                     $this->groupContactRepository->bunchInsertOrUpdate($contactGroupsFieldsDataChunk, '_uid');
-                 }
-             } */
-            if (!empty($duplicateEntries)) {
-                return $this->engineSuccessResponse([], __tr('Total __totalContactsProcessed__ contact import processed, __duplicateEntries__ phone numbers found duplicate or invalid.', [
-                    '__totalContactsProcessed__' => $totalContactsProcessed,
-                    '__duplicateEntries__' => count($duplicateEntries),
-                ]));
+            if ($freshRequest) {
+                $this->processImportContacts($request, false);
             }
-            return $this->engineSuccessResponse([], __tr('Total __totalContactsProcessed__ contact import processed', [
-                '__totalContactsProcessed__' => $totalContactsProcessed
-            ]));
+            // update vendor import contact information to null
+            setVendorSettings('internals', [
+                'contacts_import_process_data' => null
+            ]);
+            updateClientModels([
+                'existingImportRequestData' => [
+                    'progress' => 0,
+                    'progressCountFormatted' => __tr(0 . '%'),
+                ]
+            ]);
+            // delete file
+            deleteTempUploadedFile($documentName);
+            $contactsImportData = getVendorSettings('contacts_import_process_data');
+            unset($vendorAllContacts);
+            // get back with response
+            return $this->engineSuccessResponse([
+                'progressCount' => 0,
+            ], __tr('Contacts has been imported.'));
         } catch (\Throwable $th) {
             if (config('app.debug')) {
-                throw $th;
+                throw $th; // re-throw in debug mode
+                return $this->engineFailedResponse([], $th->getMessage() ?: __tr('Error occurred while importing data, please check and correct data and re-upload.'));
             }
             return $this->engineFailedResponse([], __tr('Error occurred while importing data, please check and correct data and re-upload.'));
         }
     }
+
+    /**
+     * Abort the contact import process
+     *
+     * @return EngineResponse
+     */
+    public function processAbortImportContacts()
+    {
+        $documentName = getVendorSettings('contacts_import_process_data', 'document_name');
+        setVendorSettings('internals', [
+            'contacts_import_process_data' => null
+        ]);
+        deleteTempUploadedFile($documentName);
+        // get back with response
+        return $this->engineSuccessResponse([
+            // 'progressCount' => 100,
+        ], __tr('Aborted contact import'));
+    }
+    /**
+     * Flush the contact batch
+     *
+     * @param array $contactsToUpdate
+     * @param array $customFieldsToUpdate
+     * @param array $contactGroupsToUpdate
+     * @param int $vendorId
+     * @param int $vendorAllContactsCount
+     * @param int $newContactsCount
+     * @return EngineResponse
+     */
+    private function flushContactBatch(&$contactsToUpdate, &$customFieldsToUpdate, &$contactGroupsToUpdate, $vendorId, $vendorAllContactsCount, $newContactsCount, $freshRequest = true)
+    {
+        if (!empty($contactsToUpdate) && $freshRequest) {
+            $vendorPlanDetails = vendorPlanDetails('contacts', $vendorAllContactsCount + $newContactsCount, $vendorId);
+            if (!$vendorPlanDetails['is_limit_available']) {
+                $this->processAbortImportContacts();
+                throw new \Exception($vendorPlanDetails['message']);
+            }
+            $this->contactRepository->bunchUpsert($contactsToUpdate, ['_uid']);
+            $contactsToUpdate = [];
+        }
+
+        if (!empty($customFieldsToUpdate)) {
+            // $this->contactCustomFieldRepository->storeCustomValues($customFieldsToUpdate, '_uid');
+            $this->contactCustomFieldRepository->upsertCustomValues($customFieldsToUpdate, ['_uid']);
+            $customFieldsToUpdate = [];
+        }
+
+        if (!empty($contactGroupsToUpdate)) {
+            // $this->groupContactRepository->bunchInsertOrUpdate($contactGroupsToUpdate, '_uid');
+            $this->groupContactRepository->bunchUpsert($contactGroupsToUpdate, ['contact_groups__id']);
+            $contactGroupsToUpdate = [];
+        }
+        if (function_exists('gc_collect_cycles')) {
+            // Collect garbage to free memory
+            // This is useful when processing large data sets
+            // to avoid memory leaks
+            // and ensure that memory is released.
+            gc_collect_cycles();
+        }
+    }
+
 
     /**
      * Assign User to Contact for chat
@@ -1106,17 +1353,125 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
      */
     public function processAssignChatUser($request)
     {
+        $contactUid = null;
+        $enableAiBot = data_get($request, 'enable_ai_bot');
+        $enableReplyBot = data_get($request, 'enable_reply_bot');
+        // if api request
+        if (isExternalApiRequest()) {
+            $contactData = $this->contactRepository->fetchIt([
+                'wa_id' => $request->phone_number
+            ]);
+
+            // Check if contact not exists
+            if (__isEmpty($contactData)) {
+                return $this->engineFailedResponse([], __tr('Contact user does not exists.'));
+            }
+
+            $whereClause = [
+                'email' => $request->username_or_email
+            ];
+
+            if (is_numeric($request->username_or_email)) {
+                $whereClause = [
+                    'mobile_number' => $request->username_or_email
+                ];
+            }
+
+            // Fetch Team member
+            $teamMember = $this->userRepository->fetchIt($whereClause);
+
+            // Check if contact not exists
+            if (__isEmpty($teamMember)) {
+                return $this->engineFailedResponse([], __tr('Team member does not exists.'));
+            }
+
+            $contactUid = $request->contactIdOrUid = $contactData->_uid;
+            $request->assigned_users_uid = $teamMember->_uid;
+        }
+
+        // check if contact uid is empty
+        if (__isEmpty($contactUid)) {
+            $contactUid = $request->contactIdOrUid;
+        }
+        
+        $contactDetails = $this->contactRepository->fetchIt($contactUid);
         $vendorId = getVendorId();
+        $systemMessageActions = [];
         if (!$request->assigned_users_uid or ($request->assigned_users_uid == 'no_one')) {
+            
+            // Check if AI bot is enable / disable from whatsapp chat
+            if ($enableAiBot == $contactDetails->disable_ai_bot) {
+                // Check if AI bot is enable
+                if (__isEmpty($enableAiBot)) {
+                    $systemMessageActions[] = [
+                        'action' => 'DISABLE_AI_BOT'
+                    ];
+                } else {
+                    $systemMessageActions[] = [
+                        'action' => 'ENABLE_AI_BOT'
+                    ];
+                }
+            }
+
+            // Check if Reply bot is enable / disable from whatsapp chat
+            if ($enableReplyBot == $contactDetails->disable_reply_bot) {
+                // Check if AI bot is enable
+                if (__isEmpty($enableReplyBot)) {
+                    $systemMessageActions[] = [
+                        'action' => 'DISABLE_REPLY_BOT'
+                    ];
+                } else {
+                    $systemMessageActions[] = [
+                        'action' => 'ENABLE_REPLY_BOT'
+                    ];
+                }
+            }
+
             if ($this->contactRepository->updateIt([
                 '_uid' => $request->contactIdOrUid,
                 'vendors__id' => $vendorId,
             ], [
                 'assigned_users__id' => null,
+                'disable_ai_bot' => $enableAiBot ? null : 1,
+                'disable_reply_bot' => $enableReplyBot ? null : 1
             ])) {
-                return $this->engineSuccessResponse([], __tr('Unassigned user'));
+
+                if ($contactDetails->assigned_users__id != null) {
+
+                    $systemMessageActions[] = [
+                        'action' => 'UNASSIGN_TEAM_MEMBER'
+                    ];
+                }
+
+                if (!__isEmpty($systemMessageActions)) {
+                    foreach ($systemMessageActions as $messageAction) {
+                        // Store whatsapp message log
+                        storeWhatsAppLogChatHistory([
+                            'status' => 'initialize',
+                            'contacts__id' => $contactDetails->_id,
+                            'vendors__id' => $vendorId,
+                            'contact_wa_id' => $contactDetails->wa_id,
+                            'is_system_message' => 1,
+                            'is_incoming_message' => 0,
+                            'messaged_at' => now(),
+                            '__data' => [
+                                'system_message_data' => [
+                                    'action' => $messageAction['action'],
+                                    'dynamicKey' => '__dynamicTitle__',
+                                    'dynamicValue' => ''
+                                ]
+                            ]
+                        ]);
+                    }
+                }
+
+                updateClientModels([
+                    'whatsappMessageLogs' => $this->whatsAppServiceEngine->contactChatData($contactDetails->_id)->data('whatsappMessageLogs'),
+                ], 'prepend');
+
+                return $this->engineSuccessResponse([], __tr('Request Successful.'));
             }
-            return $this->engineFailedResponse([], __tr('Already unsigned'));
+            return $this->engineFailedResponse([], __tr('Nothing to Update.'));
         }
         // get all the messaging vendor users
         $vendorMessagingUserUids = $this->userRepository->getVendorMessagingUsers($vendorId)->pluck('_uid')->toArray();
@@ -1131,15 +1486,84 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         if (__isEmpty($user)) {
             return $this->engineFailedResponse([], __tr('Failed to assign user'));
         }
+        $systemMessageActions = [];
+        // Check if AI bot is enable / disable from whatsapp chat
+        if ($enableAiBot == $contactDetails->disable_ai_bot) {
+            // Check if AI bot is enable
+            if (__isEmpty($enableAiBot)) {
+                $systemMessageActions[] = [
+                    'action' => 'DISABLE_AI_BOT',
+                    'dynamicValue' => ''
+                ];
+            } else {
+                $systemMessageActions[] = [
+                    'action' => 'ENABLE_AI_BOT',
+                    'dynamicValue' => ''
+                ];
+            }
+        }
+        
+        // Check if Reply bot is enable / disable from whatsapp chat
+        if ($enableReplyBot == $contactDetails->disable_reply_bot) {
+            // Check if AI bot is enable
+            if (__isEmpty($enableReplyBot)) {
+                $systemMessageActions[] = [
+                    'action' => 'DISABLE_REPLY_BOT',
+                    'dynamicValue' => ''
+                ];
+            } else {
+                $systemMessageActions[] = [
+                    'action' => 'ENABLE_REPLY_BOT',
+                    'dynamicValue' => ''
+                ];
+            }
+        }
+        
         if ($this->contactRepository->updateIt([
             '_uid' => $request->contactIdOrUid,
             'vendors__id' => $vendorId,
         ], [
             'assigned_users__id' => $user->_id,
+            'disable_ai_bot' => $enableAiBot ? null : 1,
+            'disable_reply_bot' => $enableReplyBot ? null : 1
         ])) {
-            return $this->engineSuccessResponse([], __tr('__userFullName__ Assigned', [
-                '__userFullName__' => $user->full_name
-            ]));
+
+            if ($user->_id != $contactDetails->assigned_users__id) {
+                $systemMessageActions[] = [
+                    'action' => 'ASSIGN_TEAM_MEMBER',
+                    'dynamicValue' => $user->full_name
+                ];
+            }
+
+            if (!__isEmpty($systemMessageActions)) {
+                foreach ($systemMessageActions as $messageAction) {
+                    // Store whatsapp message log
+                    storeWhatsAppLogChatHistory([
+                        'status' => 'initialize',
+                        'contacts__id' => $contactDetails->_id,
+                        'vendors__id' => $vendorId,
+                        'contact_wa_id' => $contactDetails->wa_id,
+                        'is_system_message' => 1,
+                        'is_incoming_message' => 0,
+                        'messaged_at' => now(),
+                        '__data' => [
+                            'system_message_data' => [
+                                'action' => $messageAction['action'],
+                                'dynamicKey' => '__dynamicTitle__',
+                                'dynamicValue' => $messageAction['dynamicValue']
+                            ]
+                        ]
+                    ]);
+                }
+            }
+
+            updateClientModels([
+                'whatsappMessageLogs' => $this->whatsAppServiceEngine->contactChatData($contactDetails->_id)->data('whatsappMessageLogs'),
+            ], 'prepend');
+
+            return $this->engineSuccessResponse([
+                'contact_uid' => $contactUid
+            ],  __tr('Request Successful.'));
         }
         return $this->engineResponse(14, [], __tr('No changes'));
     }
@@ -1217,7 +1641,7 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         $listOfAllLabels = $this->labelRepository->fetchItAll([
             'vendors__id' => $vendorId
         ]);
-        return$this->engineSuccessResponse([
+        return $this->engineSuccessResponse([
             'contact_uid' => $contactUid,
             'listOfAllLabels' => $listOfAllLabels
         ]);
@@ -1237,7 +1661,7 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         ]);
         // get the vendor users having messaging permission
         $vendorMessagingUsers = $this->userRepository->getVendorMessagingUsers($vendorId);
-        return$this->engineSuccessResponse([
+        return $this->engineSuccessResponse([
             'contact_uid' => $contactUid,
             'listOfAllLabels' => $listOfAllLabels,
             'vendorMessagingUsers' => $vendorMessagingUsers,
@@ -1268,11 +1692,11 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
                 'allLabels' => $allLabels
             ]);
 
-            return$this->engineSuccessResponse([
+            return $this->engineSuccessResponse([
                 'createdLabel' => $createdLabel
             ], __tr('Label created'));
         }
-        return$this->engineFailedResponse([], __tr('Failed to create label'));
+        return $this->engineFailedResponse([], __tr('Failed to create label'));
     }
 
     /**
@@ -1301,8 +1725,32 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
         // prepare group ids needs to be remove from the contact
         $labelsToBeDeleted = array_diff($existingLabelIds, $inputData['contact_labels'] ?? []);
         $isUpdated = false;
+        $labelChatHistoryMessages = [];
         // process to delete if needed
         if (! empty($labelsToBeDeleted)) {
+
+            $labelsToBeDeletedCollection = $this->labelRepository->fetchItAll($labelsToBeDeleted, [], '_id');
+            foreach ($labelsToBeDeletedCollection as $deletedLabel) {
+                $deleteHistoryMessage = $deletedLabel->title . ' label deleted from this chat.';
+                storeWhatsAppLogChatHistory([
+                    'status' => 'initialize',
+                    'contacts__id' => $contact->_id,
+                    'vendors__id' => $vendorId,
+                    'contact_wa_id' => $contact->wa_id,
+                    'is_system_message' => 1,
+                    'is_incoming_message' => 0,
+                    'messaged_at' => now(),
+                    '__data' => [
+                        'system_message_data' => [
+                            'action' => 'LABEL_REMOVED',
+                            'dynamicKey' => '__dynamicTitle__',
+                            'dynamicValue' => $deletedLabel->title
+                        ]
+                    ]
+                ]);
+                $labelChatHistoryMessages[] = $deleteHistoryMessage;
+            }
+
             if ($this->contactLabelRepository->deleteAssignedLabels($labelsToBeDeleted, $contact->_id)) {
                 $isUpdated = true;
             }
@@ -1320,12 +1768,34 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
                     'labels__id' => $labelToBeAdded->_id,
                     'contacts__id' => $contact->_id,
                 ];
+
+                storeWhatsAppLogChatHistory([
+                    'status' => 'initialize',
+                    'contacts__id' => $contact->_id,
+                    'vendors__id' => $vendorId,
+                    'contact_wa_id' => $contact->wa_id,
+                    'is_system_message' => 1,
+                    'is_incoming_message' => 0,
+                    'messaged_at' => now(),
+                    '__data' => [
+                        'system_message_data' => [
+                            'action' => 'LABEL_ADDED',
+                            'dynamicKey' => '__dynamicTitle__',
+                            'dynamicValue' => $labelToBeAdded->title
+                        ]
+                    ]
+                ]);
             }
             if ($this->contactLabelRepository->storeItAll($assignLabels)) {
                 $isUpdated = true;
             }
         }
         if ($isUpdated) {
+            // Update chat history on chat container 
+            updateClientModels([
+                'whatsappMessageLogs' => $this->whatsAppServiceEngine->contactChatData($contact->_id)->data('whatsappMessageLogs'),
+            ], 'prepend');
+
             return $this->engineSuccessResponse([], __tr('Labels updated'));
         }
         return $this->engineResponse(14, null, __tr('Nothing to update'));
@@ -1383,7 +1853,7 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
 
             // get all the labels
             $allLabels = $this->labelRepository->fetchItAll([
-               'vendors__id' => $vendorId
+                'vendors__id' => $vendorId
             ]);
 
             updateClientModels([
@@ -1395,5 +1865,190 @@ class ContactEngine extends BaseEngine implements ContactEngineInterface
             ], __tr('Label updated'));
         }
         return $this->engineResponse(14, null, __tr('nothing updated'));
+    }
+
+    /**
+     * Block Contact
+     *
+     * @param BaseRequestTwo $labelUid
+     * @return EngineResponse
+     */
+    public function processBlockContact($contactIdOrUid)
+    {
+        $vendorId = getVendorId();
+        $contactWhereClause = [
+            'vendors__id' => $vendorId,
+        ];
+        // if api request
+        if (isExternalApiRequest()) {
+            $contactWhereClause['wa_id'] = $contactIdOrUid;
+        } else {
+            $contactWhereClause['_uid'] = $contactIdOrUid;
+        }
+        $contact = $this->contactRepository->fetchIt($contactWhereClause);
+        // Check if $contact not exist then throw not found
+        // exception
+        if (__isEmpty($contact)) {
+            return $this->engineResponse(18, null, __tr('Contact not found.'));
+        }
+
+        $blockedData = $this->whatsAppApiService->blockContact($contact->wa_id);
+
+        // block contact
+        if ($blockedData and !Arr::has($blockedData, "errors")) {
+
+            if ($updatedDAta = $this->contactRepository->updateIt($contact, [
+                'wa_blocked_at' => now()
+            ])) {
+
+                updateClientModels([
+                    'contact' => $contact
+                ]);
+
+                return $this->engineSuccessResponse([], __tr('Contact blocked'));
+            }
+        } elseif ($blockedData and Arr::has($blockedData, "errors")) {
+            $errorMessage = Arr::get($blockedData, 'errors.error_data.details', __tr('Failed to block Contact'));
+
+            return $this->engineFailedResponse([], $errorMessage);
+        }
+
+        // if failed to delete
+        return $this->engineFailedResponse([], __tr('Failed to block Contact'));
+    }
+
+    /**
+     * Block Contact
+     *
+     * @param BaseRequestTwo $labelUid
+     * @return EngineResponse
+     */
+    public function processUnblockContact($contactIdOrUid)
+    {
+        $vendorId = getVendorId();
+        $contactWhereClause = [
+            'vendors__id' => $vendorId,
+        ];
+        // if api request
+        if (isExternalApiRequest()) {
+            $contactWhereClause['wa_id'] = $contactIdOrUid;
+        } else {
+            $contactWhereClause['_uid'] = $contactIdOrUid;
+        }
+        $contact = $this->contactRepository->fetchIt($contactWhereClause);
+        // Check if $contact not exist then throw not found
+        // exception
+        if (__isEmpty($contact)) {
+            return $this->engineResponse(18, null, __tr('Contact not found.'));
+        }
+
+        $unblockedData = $this->whatsAppApiService->unBlockContact($contact->wa_id);
+
+        // block contact
+        if ($unblockedData and !Arr::has($unblockedData, "errors")) {
+            // if successful
+
+            if ($this->contactRepository->updateIt($contact, [
+                'wa_blocked_at' => null
+            ])) {
+
+                updateClientModels([
+                    'contact' => $contact
+                ]);
+
+                return $this->engineSuccessResponse([], __tr('Contact unblocked'));
+            }
+        }
+
+        // if failed to delete
+        return $this->engineFailedResponse([], __tr('Failed to unblock Contact'));
+    }
+
+    /**
+     * Prepare team member list data
+     *
+     * @return  array
+     *---------------------------------------------------------------- */
+
+    public function prepareTeamMemberListData($contactIdOrUid)
+    {
+        $contact = null;
+
+        // Check if request for bulk action
+        if ($contactIdOrUid != 'bulk_action') {
+            $contact = $this->contactRepository->fetchContactWithAssignUser($contactIdOrUid);
+
+            // Check if contact exists
+            if (__isEmpty($contact)) {
+                return $this->engineResponse(18, [], __tr('Contact does not exist.'), true);
+            }
+        }
+
+        $teamMembers = $this->userRepository->fetchTeamMembers();
+
+        return $this->engineResponse(1, [
+            'teamMembers' => $teamMembers->toArray(),
+            'userUID' => getUserUID(),
+            'contact' => $contact,
+            'is_bulk_action' => ($contactIdOrUid == 'bulk_action') ?? false
+        ]);
+    }
+
+    /**
+     * Process assign team member
+     *
+     * @param $inputData
+     *
+     * @return  array
+     *---------------------------------------------------------------- */
+
+    public function processAssignTeamMemberInBulk($inputData)
+    {
+        $contactUids = explode(',', $inputData['contactIdOrUid']);
+
+        $dynamicTitle = '';
+        $action = '';
+        if ($inputData['assigned_users_uid'] == 'no_one') {
+            $inputData['assign_user_id'] = null;
+            $action = 'UNASSIGN_TEAM_MEMBER';
+        } else {
+            $teamMemberData = $this->userRepository->fetchIt($inputData['assigned_users_uid']);
+
+            // Check if team member exists
+            if (__isEmpty($teamMemberData)) {
+                return $this->engineResponse(18, [], __tr('Team member does not exists.'));
+            }
+            $inputData['assign_user_id'] = $teamMemberData->_id;
+
+            $action = 'ASSIGN_TEAM_MEMBER';
+            $dynamicTitle = $teamMemberData->full_name;
+        }
+
+        $contactCollection = $this->contactRepository->fetchItAll($contactUids, [], '_uid');
+
+        foreach ($contactCollection as $contactDetails) {
+            storeWhatsAppLogChatHistory([
+                'status' => 'initialize',
+                'contacts__id' => $contactDetails->_id,
+                'vendors__id' => getVendorId(),
+                'contact_wa_id' => $contactDetails->wa_id,
+                'is_system_message' => 1,
+                'is_incoming_message' => 0,
+                'messaged_at' => now(),
+                '__data' => [
+                    'system_message_data' => [
+                        'action' => $action,
+                        'dynamicKey' => '__dynamicTitle__',
+                        'dynamicValue' => $dynamicTitle
+                    ]
+                ]
+            ]);
+        }
+
+        if ($this->contactRepository->assignTeamMemberToContacts($contactUids, $inputData)) {
+            return $this->engineResponse(1, [], __tr('Team member assigned successfully.'));
+        }
+
+        return $this->engineResponse(14, [], __tr('Nothing Update.'), true);
     }
 }

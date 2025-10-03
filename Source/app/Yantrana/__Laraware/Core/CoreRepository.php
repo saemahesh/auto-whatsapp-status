@@ -3,7 +3,7 @@
 namespace App\Yantrana\__Laraware\Core;
 
 /**
- * Core Repository - 1.8.11 - 16 APR 2024
+ * Core Repository - 1.9.13 - 17 JUL 2025
  *
  * Base Repository for Laravel applications
  *
@@ -296,7 +296,7 @@ abstract class CoreRepository
             } elseif (is_array($idOrUid) and $whereInKey) {
                 // is array and if it is empty then added  dummy item to prevent
                 // false result that may all the result get backed
-                if(empty($idOrUid)) {
+                if (empty($idOrUid)) {
                     $idOrUid = [
                         '___no_where_in_items___'
                     ];
@@ -311,7 +311,7 @@ abstract class CoreRepository
             }
         }
         // useful in case of where in etc
-        if(!empty($options['where'])) {
+        if (!empty($options['where'])) {
             $query->where($options['where']);
         }
         // get all the columns except
@@ -362,7 +362,7 @@ abstract class CoreRepository
      *
      * @since  1.0.0 - 11 JUN 2019
      *
-     * @last-modified - 22 JUN 2021
+     * @last-modified - 23 JUN 2025
      *-----------------------------------------------------------------------*/
     public function deleteIt($eloquentModel)
     {
@@ -370,7 +370,7 @@ abstract class CoreRepository
         if (is_string($eloquentModel) or is_int($eloquentModel) or is_array($eloquentModel)) {
             $eloquentModel = $this->fetchIt($eloquentModel);
         }
-        if ($eloquentModel->deleteIt()) {
+        if ($eloquentModel && $eloquentModel->deleteIt()) {
             return true;
         }
 
@@ -454,11 +454,16 @@ abstract class CoreRepository
      *
      * @since  1.4.9 - 18 JAN 2024
      *
-     * @updated  1.5.10 - 19 JAN 2024
+     * @updated  1.9.13 - 17 JUL 2025
      *---------------------------------------------------------------- */
-    public function storeItAll(array $inputData, $returnColumn = false)
+    public function storeItAll(array $inputData, $returnColumn = false, $options = [])
     {
-        return (new $this->primaryModel())->prepareAndInsert($inputData, $returnColumn);
+        // options
+        $options = array_merge([
+            'json_checks' => true
+        ], $options);
+
+        return (new $this->primaryModel())->prepareAndInsert($inputData, $returnColumn, $options);
     }
 
     /**
@@ -473,9 +478,23 @@ abstract class CoreRepository
      */
     public function bunchInsertOrUpdate(array $data, ?string $index = null, $whereConditions = [])
     {
-        if($index) {
+        if ($index) {
             return (new $this->primaryModel())->bunchInsertUpdate($data, $index, $whereConditions);
         }
         return (new $this->primaryModel())->prepareAndInsert($data);
+    }
+
+    /**
+     * Bunch upsert
+     *
+     * @param array $data
+     * @param array $uniqueBy
+     * @return mixed
+     *
+     * @since  1.9.13 - 11 JUL 2025
+     */
+    public function bunchUpsert(array $data, array $uniqueBy = [])
+    {
+        return (new $this->primaryModel())::upsert($data, uniqueBy: $uniqueBy, update: array_keys($data[0]) ?: []);
     }
 }

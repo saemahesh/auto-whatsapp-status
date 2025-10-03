@@ -1,4 +1,22 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
 * ContactRepository.php - Repository file
@@ -35,6 +53,9 @@ class ContactRepository extends BaseRepository implements ContactRepositoryInter
     {
         // basic configurations for dataTables data
         $dataTableConfig = [
+             'fieldAlias' => [
+                'phone_number' => 'wa_id'
+             ],
             // searchable columns
             'searchable' => [
                 'first_name',
@@ -42,12 +63,17 @@ class ContactRepository extends BaseRepository implements ContactRepositoryInter
                 'countries__id',
                 'wa_id',
                 'email',
-
             ],
         ];
 
         // get Model result for dataTables
-        $query = $this->primaryModel::with(['groups'])->where([
+        $query = $this->primaryModel::with([
+            'groups' => function ($query) {
+                $query->distinct('_id');
+            },
+            'lastIncomingMessage'
+        ])
+        ->where([
             'vendors__id' => getVendorId()
         ]);
         if ($contactGroupUid) {
@@ -106,6 +132,10 @@ class ContactRepository extends BaseRepository implements ContactRepositoryInter
             $keyValues['disable_ai_bot'] = getVendorSettings('default_enable_flowise_ai_bot_for_users', null, null, $vendorId) ? 0 : 1;
         }
 
+        if (isset($inputData['enable_reply_bot'])) {
+            $keyValues['disable_reply_bot'] = ($inputData['enable_reply_bot']) ? 0 : 1;
+        }
+
         return $this->storeIt($inputData, $keyValues);
     }
     /**
@@ -141,11 +171,11 @@ class ContactRepository extends BaseRepository implements ContactRepositoryInter
      * Get contact by phone number and vendor id
      * If the contact does not found we will check db if it is stored without country code and will update the same.
      *
-     * @param integer $waId
-     * @param string|null $vendorId
+     * @param int $waId
+     * @param int|null $vendorId
      * @return Eloquent
      */
-    public function getVendorContactByWaId(int $waId, ?string $vendorId = null)
+    public function getVendorContactByWaId(int $waId, ?int $vendorId = null)
     {
         $contact = $this->fetchIt([
             'vendors__id' => $vendorId ? $vendorId : getVendorId(),
@@ -423,5 +453,33 @@ class ContactRepository extends BaseRepository implements ContactRepositoryInter
         }
 
         return $query->count();
+    }
+
+    /**
+     * Fetch contact with assigned user
+     *
+     * @param int $contactIdOrUid
+     * @return int
+     */
+    public function fetchContactWithAssignUser($contactIdOrUid) 
+    {
+        return $this->primaryModel::where([
+            '_uid' => $contactIdOrUid
+        ])->with('assignedUser')->first();
+    }
+
+    public function assignTeamMemberToContacts($contactUIDs, $inputData) 
+    {
+        return $this->primaryModel::whereIn('_uid', $contactUIDs)
+            ->update([
+                'assigned_users__id' => $inputData['assign_user_id']
+            ]);
+    }
+
+    public function deleteAllContact($vendorId, $testContactUid)
+    {
+        return $this->primaryModel::where([
+             'vendors__id' => $vendorId
+        ])->whereNotIn('_uid', [$testContactUid])->delete();
     }
 }

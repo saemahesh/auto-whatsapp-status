@@ -1,4 +1,22 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
  * DashboardEngine.php - Main component file
@@ -181,7 +199,7 @@ class DashboardEngine extends BaseEngine implements DashboardEngineInterface
         $vendorWhereClause = [
             'vendors__id' => $vendorId
         ];
-
+        
         return array_merge([
             'firstOfMonth' => Carbon::now()->firstOfMonth(),
             'lastOfMonth' => Carbon::now()->lastOfMonth(),
@@ -197,7 +215,9 @@ class DashboardEngine extends BaseEngine implements DashboardEngineInterface
                 'status' => 1,
                 'vendors__id' => $vendorId
             ]),
-            'totalMessagesProcessed' => $this->whatsAppMessageLogRepository->countIt($vendorWhereClause),
+            'totalMessagesProcessed' => $this->whatsAppMessageLogRepository->countIt(
+                array_merge($vendorWhereClause, ['is_system_message' => null])
+            ),
         ]);
     }
 
@@ -246,13 +266,14 @@ class DashboardEngine extends BaseEngine implements DashboardEngineInterface
             }
             if(isset($onOffFeatures[$planFeatureKey])) {
                 $vendorPlanDetails = vendorPlanDetails($planFeatureKey, 0, $vendorId, [
-                    'plan_id' => $planDetails['id']
+                    'plan_id' => $planDetails['id'],
+                     'expiry_check' => false
                 ]);
                 if($onOffFeatures[$planFeatureKey] and !$vendorPlanDetails->isLimitAvailable()) {
                     $featuresLimitUnavailable[] = $planFeature['description'];
                 }
             }
         }
-        return implode(', ', $featuresLimitUnavailable ?? []);
+        return trim(implode(', ', $featuresLimitUnavailable ?? []));
     }
 }

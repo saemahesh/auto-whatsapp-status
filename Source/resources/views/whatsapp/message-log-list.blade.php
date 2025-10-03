@@ -18,6 +18,10 @@
 @endpush
 @php
 $type=request()->is_incoming_message;
+// If $type is null, set it to a default value (e.g., 'all')
+if (is_null($type)) {
+    $type = 'all'; 
+}
 $startDate=request()->msg_start_date;
 $endDate=request()->msg_end_date;
 @endphp
@@ -68,7 +72,7 @@ $endDate=request()->msg_end_date;
         <!--datatable-->
         <div class="col-xl-12 mt-4">
             <x-lw.datatable id="lwMessageList" :url="route('vendor.whatsapp.message.log.list', [
-                'isIncomingMsg' => $type ?: 'all','msgStartDate' => $startDate ?: 'any','msgEndDate' => $endDate ?: 'any'
+                'isIncomingMsg' => $type ,'msgStartDate' => $startDate ?: 'any','msgEndDate' => $endDate ?: 'any'
             ])">
              
                 <th data-orderable="true" data-name="recepient">{{ __tr('Recipient') }}</th>
@@ -143,3 +147,9 @@ $endDate=request()->msg_end_date;
     </div>
 </div>
 @endsection()
+@push('appScripts')
+<?= __yesset([
+            'dist/js/whatsapp-template.js',
+        ],true,
+) ?>
+@endpush

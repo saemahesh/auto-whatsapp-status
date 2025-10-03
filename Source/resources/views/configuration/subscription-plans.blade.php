@@ -134,6 +134,9 @@
 
                                 </div>
                                 <h3 class="text-danger mt-4">{{ __tr('Charges') }}</h3>
+                                <!-- Use to show some notes regarding charges or payment gateway -->
+                                @stack('chargesNoteStack')
+                                <!-- /Use to show some notes regarding charges or payment gateway -->
                                 @if (!__isEmpty($plan['charges']))
                                     <div class="row">
                                         <div class="col-xl-12">

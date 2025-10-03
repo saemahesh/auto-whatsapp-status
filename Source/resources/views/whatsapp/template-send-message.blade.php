@@ -1,7 +1,10 @@
-@extends('layouts.app', ['title' => $contact ? __tr('Send WhatsApp Template Message') : __tr('Create New Campaign')])
+@php
+    $isForIndividualContact = !__isEmpty($contact);
+@endphp
+@extends('layouts.app', ['title' => $isForIndividualContact ? __tr('Send WhatsApp Template Message') : __tr('Create New Campaign')])
 @section('content')
 @include('users.partials.header', [
-'title' => $contact ? __tr('Send WhatsApp Template Message') : __tr('Create New Campaign'),
+'title' => $isForIndividualContact ? __tr('Send WhatsApp Template Message') : __tr('Create New Campaign'),
 'description' => '',
 // 'class' => 'col-lg-7'
 ])
@@ -18,6 +21,11 @@
     </div>
     <!--/ button -->
     <div class="col-12">
+        @if(session('loggedBySuperAdmin') and !getAppSettings('enable_queue_jobs_for_campaigns') and (!getAppSettings('cron_setup_done_at')))
+        <div class="alert alert-danger text-left">
+            <strong>{{  __tr('App Alert!!') }}</strong> {{  __tr('Cron Job or Queue Worker setup is required to execute campaigns. Please see Setup and Integration page in SuperAdmin area.') }}
+        </div>
+        @endif
         <div class="card">
             @if ($contact)
             <div class="card-header">
@@ -40,7 +48,7 @@
                     <h2 class="text-warning">{{  __tr('Step 1') }}</h2>
                     @endif
                     <x-lw.form lwSubmitOnChange data-event-callback="lwPrepareUploadPlugIn"
-                        :action="route('vendor.request.template.view')" data-pre-callback="clearTemplateContainer">
+                        :action="route('vendor.request.template.view')" data-pre-callback="clearTemplateContainer" data-callback="onTemplateChangeProcess">
                         <div x-cloak x-show="!selectedTemplate">
                             <x-lw.input-field x-model="selectedTemplate"
                                 placeholder="{!! __tr('Select & Configure Template') !!}" type="selectize"
@@ -51,7 +59,7 @@
                                     <option value="">{{ __tr('Select & Configure Template') }}</option>
                                     @foreach ($whatsAppTemplates as $whatsAppTemplate)
                                     <option value="{{ $whatsAppTemplate->_uid }}">{{ $whatsAppTemplate->template_name }}
-                                        ({{ $whatsAppTemplate->language }})</option>
+                                        ({{ $whatsAppTemplate->language }}) - ({{ $whatsAppTemplate->category }})</option>
                                     @endforeach
                                 </x-slot>
                             </x-lw.input-field>
@@ -67,7 +75,9 @@
                             <div id="lwTemplateStructureContainer">
                                 {!! $template !!}
                             </div>
-                             @include('whatsapp.from-phone-number')
+                            
+                            {{-- /Carousel Template View --}}
+                            @include('whatsapp.from-phone-number')
                             <button type="submit" class="btn btn-primary mt-4">{{ __tr('Send') }}</button>
                         </x-lw.form>
                         @else
@@ -76,6 +86,7 @@
                             <div id="lwTemplateStructureContainer">
                                 {!! $template !!}
                             </div>
+                            
                             <h2 class="mt-5 text-warning">{{  __tr('Step 2') }}</h2>
                            <fieldset class="col-sm-12 col-md-8 col-lg-6">
                             <legend>{{  __tr('Contacts and Schedule') }}</legend>
@@ -136,6 +147,25 @@
                                         </div>
                                     </template>
                                 </fieldset>
+                                <fieldset x-data="{expiryOn:false}">
+                                    <legend>{{  __tr('Expiry') }}</legend>
+                                    <div class="alert alert-danger">
+                                        {{  __tr("Messages will be set as expired if delayed in sending and won't be sent for the further processing.") }}
+                                    </div>
+                                    <div class="form-group pt-3">
+                                        <label for="lwExpiryCampaign">
+                                            <input x-model="expiryOn" type="checkbox" id="lwExpiryCampaign"  data-secondary-color="#D3D3D3" data-lw-plugin="lwSwitchery" value="" name="expire_on">
+                                          <span x-show="expiryOn">{{ __tr('Set Expiry for Messages') }}</span>
+                                          <span x-show="!expiryOn">{{ __tr('No Expiry for Processing') }}</span>
+                                        </label>
+                                    </div>
+                                    <template x-if="expiryOn">
+                                        <div x-show="expiryOn" x-data="{ minDate: '{{ formatDateTime(now(), 'Y-m-d\TH:i:s') }}' }">
+                                            <x-lw.input-field  type="datetime-local" id="lwExpireAt" data-form-group-class="" min="{{ formatDateTime(now(), 'Y-m-d\TH:i:s') }}" :label="__tr('Expire At')" name="expire_at" required />
+                                        </div>
+                                        
+                                    </template>
+                                </fieldset>
                            </fieldset>
                            @include('whatsapp.from-phone-number')
                            <div class="my-4">
@@ -155,6 +185,10 @@
 </div>
 @endsection()
 @push('appScripts')
+<?= __yesset([
+            'dist/js/whatsapp-template.js',
+        ],true,
+) ?>
 <script>
     (function($){
             'use strict';
@@ -162,6 +196,13 @@
                 $('#lwTemplateStructureContainer').text('');
                 return inputData;
             };
+            window.onTemplateChangeProcess = function(responseData) {
+                if (responseData.reaction == 1) {
+                    _.defer(function() {
+                        window.lwPluginsInit();
+                    });
+                }                
+            }
             @if(request()->use_template)
             // Initial Change if required
             __DataRequest.post('{{ route('vendor.request.template.view') }}', {

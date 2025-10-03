@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * ManualSubscriptionEngine.php - Main component file
 *
 * This file is part of the Subscription component.
@@ -347,10 +365,7 @@ class ManualSubscriptionEngine extends BaseEngine implements ManualSubscriptionE
             'existing_plan_days_adjusted' => 0
         ];
         // get the current subscription
-        $currentActiveSubscription = $this->manualSubscriptionRepository->fetchIt([
-            'vendors__id' => $vendorId,
-            'status' => 'active',
-        ]);
+        $currentActiveSubscription = $this->manualSubscriptionRepository->getCurrentActiveSubscription($vendorId);
         $existingPlanDaysAdjustments = false;
         $checkPlanUsages = $this->dashboardEngine->checkPlanUsages($planDetails, $vendorId);
         if ($checkPlanUsages) {
@@ -361,7 +376,9 @@ class ManualSubscriptionEngine extends BaseEngine implements ManualSubscriptionE
                 'existingRequestExist' => $existingRequestExist,
                 'checkPlanUsages' => $checkPlanUsages,
             ],
-                'overused features'
+                __tr('Overused features __overUsedFeatures__', [
+                    '__overUsedFeatures__' => $checkPlanUsages
+                ])
             );
         }
         // prorated adjustments
@@ -377,7 +394,8 @@ class ManualSubscriptionEngine extends BaseEngine implements ManualSubscriptionE
             $dailyCharge = 0;
             $proratedBalance = 0;
             if ($existingTotalDays) {
-                $dailyCharge = $existingPlanCharges / $existingTotalDays;
+                $dailyCharge = $existingPlanCharges / ($currentActiveSubscription->charges_frequency == 'monthly' ? now()->daysInMonth : now()->daysInYear);
+                // $dailyCharge = $existingPlanCharges / $existingTotalDays;
                 // Calculate prorated balance
                 $proratedBalance = round($dailyCharge * $remainingDays, 2);
             }

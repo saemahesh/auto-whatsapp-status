@@ -1,4 +1,22 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 namespace App\Yantrana\Components\Subscription\PaymentEngines;
 
@@ -65,7 +83,9 @@ class YoomoneyEngine extends BaseEngine
       
         $vendorData=getUserAuthInfo();
         $vatId = $this->yoomoneyVatKey ?? '1'; // set 1 for testing
-     
+        if (empty($vendorData['profile']['full_name']) || empty($vendorData) ) {
+            return $this->engineFailedResponse(['show_message' => true], __tr('Missing required payment information.'));
+        }
         $fullName='';
         $email='';
         if (!empty($vendorData) && isset($vendorData['profile']['full_name'])) {
@@ -88,11 +108,12 @@ class YoomoneyEngine extends BaseEngine
         // 1058960 ,test_9A2VPY_hTfwKzRXEMG7g_5dLF4n6x6kpIhyqaU04u9E
         try {
             $client = new Client();
+           
             $client->setAuth(
-                $this->yoomoneyKey,
+                (int)$this->yoomoneyKey,
                 $this->yoomoneySecret
             );
-          
+            $orderId = uniqid('', true);
             $payment = $client->createPayment(
                 [
                     'amount' => [
@@ -106,9 +127,9 @@ class YoomoneyEngine extends BaseEngine
                         ]),
                     ],
                     'capture' => true,
-                    'description' => 'Order No.' . uniqid(),
+                    'description' => 'Order No.' . $orderId,
                     'metadata' => [
-                        'order_id' => uniqid(),
+                        'order_id' => $orderId,
                         'manual_subscription_uid'=> $manualSubscriptionUid,
                     ],
                     'receipt' => [
@@ -131,7 +152,7 @@ class YoomoneyEngine extends BaseEngine
             ],
                     ],
                 ],
-                uniqid('', true)
+                $orderId
             );
          
         
@@ -151,8 +172,12 @@ class YoomoneyEngine extends BaseEngine
             'payment_id' => $payment->getId()
             ]);
         }
-
-    } catch (\Exception $e) {
+    } catch (\YooKassa\Common\Exceptions\ApiException $e) {
+        return $this->engineFailedResponse(['show_message' => false], __tr('Invalid Credentials'));
+        // API exception (e.g., invalid credentials, invalid request)
+        echo 'API Error: ' . $e->getMessage();
+    } 
+    catch (\Exception $e) {
         __logDebug('Error', ['message' => $e->getMessage()]);
         return $this->engineFailedResponse(['show_message' => false], __tr('Invalid Data'));
     }

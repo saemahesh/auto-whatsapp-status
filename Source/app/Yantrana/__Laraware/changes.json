@@ -2,6 +2,24 @@
     "name": "Laraware",
     "version": "1.x.x",
     "releases": {
+        "1.79.200": {
+            "title": "Core Repository - 1.9.13, Core Model - 1.7.11",
+            "date": "17 JUL 2025",
+            "message": "Added bunchUpsert and storeItAll and Model prepareAndInsert now have options to whatever to check JSON validation",
+            "author": "Vinod Raut"
+        },
+        "1.78.198": {
+            "title": "Core Helper - 1.20.52",
+            "date": "23 JUN 2025",
+            "message": "viaFlashCache now works if running in command line",
+            "author": "Vinod Raut"
+        },
+        "1.78.197": {
+            "title": "Core Repository - 1.8.12",
+            "date": "23 JUN 2025",
+            "message": "deleteIt now check if the item is not null before deleting",
+            "author": "Vinod Raut"
+        },
         "1.78.196": {
             "title": "Core Helper - 1.20.50",
             "date": "09 DEC 2024",

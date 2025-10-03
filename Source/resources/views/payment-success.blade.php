@@ -14,13 +14,13 @@
                     <div class="col-md-8 text-center">
                         <div class="card">
                             <div class="card-header" style="background-color: #2bac32;">
-                                <h3 class="text-white">Payment Successful!</h3>
+                                <h3 class="text-white">{{ __tr('Payment Successful!') }}</h3>
                             </div>
                             <div class="card-body">
-                                <p class="lead">Thank you for your purchase.</p>
-                                <p>Your payment has been successfully processed.</p>
-                                <p>Transaction ID: <strong class="text-dark ">{{ $txnReferenceId }}</strong></p>
-                                <a href="{{ route('subscription.read.show') }}" class="btn btn-primary mt-3">Go to Subscription</a>
+                                <p class="lead">{{ __tr('Thank you for your purchase.') }}</p>
+                                <p>{{ __tr('Your payment has been successfully processed.') }}</p>
+                                <p>{{ __tr('Transaction ID:') }} <strong class="text-dark ">{{ $txnReferenceId }}</strong></p>
+                                <a href="{{ route('subscription.read.show') }}" class="btn btn-primary mt-3">{{ __tr('Go to Subscription') }}</a>
                             </div>
                         </div>
                     </div>

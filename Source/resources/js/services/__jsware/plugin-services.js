@@ -76,9 +76,10 @@
                             // disabledOpacity   : 0.5,
                             // speed             : '0.4s',
                             // size              : 'default',
+                            'defaultState' : $($switcheryFieldElement).data('default-state', switcheryFieldElement.checked)
                         }, switcheryData);
                     }
-                    new Switchery($switcheryFieldElement[0], switcheryData);
+                    switcheryFieldElement.switchery = new Switchery($switcheryFieldElement[0], switcheryData);
                 }
                 $switcheryFieldElement = switcheryFieldElement = switcheryData = null;
             });
@@ -106,7 +107,8 @@
                             }
                             // dispatch event for change to grab
                             $(this.$input[0]).trigger('lwSelectizeOnChange', value);
-                        }
+                    },
+                    dropdownParent: 'body' // Forces dropdown to render outside container
                     },
                     selectizeFieldElementData = $selectizeFieldElement.data();
                 if (selectizeFieldElementData) {

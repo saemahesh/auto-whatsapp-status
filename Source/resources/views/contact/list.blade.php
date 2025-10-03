@@ -18,7 +18,7 @@ $currentGroup = $groupUid ? $vendorContactGroups->where('_uid', $groupUid)->firs
 @php
 $groupDescription = $groupUid ? $currentGroup->description : '';
 @endphp
-<div class="container-fluid mt-lg--6">
+<div class="container-fluid mt-lg--6" x-data="initialContactsInfoData">
     <div class="row">
         <!-- button -->
         <div class="col-xl-12 mb-3">
@@ -26,33 +26,53 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                 @if ($groupUid)
                 <a class="lw-btn btn btn-secondary" href="{{ route('vendor.contact.group.read.list_view') }}">{{
                     __tr('Back to Contact Groups') }}</a>
+                <a class="lw-btn btn btn-secondary" href="{{ route('vendor.contact.read.list_view') }}">{{
+                    __tr('Back to Contacts') }}</a>
                 @endif
                 <button type="button" class="lw-btn btn btn-primary" data-toggle="modal" data-target="#lwAddNewContact">
                     {{ __tr('Create New Contact') }}</button>
-                <button type="button" class="lw-btn btn btn-dark" data-toggle="modal" data-target="#lwExportDialog"> {{
-                    __tr('Export Contacts') }}</button>
+                @if (!$groupUid)
+                <button type="button" class="lw-btn btn btn-dark" data-toggle="modal" data-target="#lwExportDialog"> <i class="fa fa-download"></i> {{ __tr('Download Contacts') }}</button>
                 <button type="button" class="lw-btn btn btn-dark" data-toggle="modal"
-                    data-target="#lwImportContactDialog"> {{ __tr('Import Contacts') }}</button>
+                    data-target="#lwImportContactDialog"><i class="fa fa-upload"></i> {{ __tr('Upload Contacts') }}</button>
+                @endif
             </div>
         </div>
         <!--/ button -->
         {{-- import contacts --}}
-        <x-lw.modal id="lwImportContactDialog" :header="__tr('Import Contacts')" :hasForm="true"
+        <x-lw.modal id="lwImportContactDialog" :header="__tr('Upload Contacts')" :hasForm="true"
             data-pre-callback="appFuncs.clearContainer">
             <x-lw.form id="lwImportContactDialogForm" :action="route('vendor.contact.write.import')"
                 :data-callback-params="['modalId' => '#lwImportContactDialog', 'datatableId' => '#lwContactList']"
-                data-callback="appFuncs.modelSuccessCallback">
-                <div class="lw-form-modal-body">
-                    <div class="alert alert-danger">
-                        {{ __tr('Please use Template from Export contacts') }}
+                data-callback="window.onImportProcessUpdate">
+                <div class="lw-form-modal-body p-3">
+                <div x-cloak class="text-center" x-show="existingImportRequestData.progress">
+                    <h1 class="text-success" x-text="existingImportRequestData.progressCountFormatted"></h1>
+                    <h4 x-show="existingImportRequestData.estimatedRemainingTime" class="text-muted">{{  __tr('Estimated time remaining') }}</h4>
+                    <h4 class="text-info" x-show="existingImportRequestData.estimatedRemainingTime" x-text="existingImportRequestData.estimatedRemainingTime"></h4>
+                    <h3>{{  __tr('Please wait ... contacts import is in progress') }}</h3>
+                    <div class="progress" role="progressbar" aria-label="{{ __tr('contacts import in progress') }}" :aria-valuenow="existingImportRequestData.progress" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" :style="{'width':existingImportRequestData.progress + '%'}" style="width: 0%"></div>
                     </div>
-                    <p>{{ __tr('You can import excel file with new contacts or existing updated.') }}</p>
+                    <div>
+                        <a class="lw-ajax-link-action btn btn-danger btn-sm" data-confirm="<?= __tr('Are you sure you want to abort importing contacts?') ?>" href="{{ route('vendor.contact.write.abort_import') }}" data-callback="__Utils.viewReload" role="button" data-method="post">{{  __tr('Abort') }}</a>
+                        <div>
+                            <small class="text-muted">{{  __tr('In case process stuck at some point, please reload page.') }}</small>
+                        </div>
+                    </div>
+                </div>
+                {{-- if existing request is not in progress --}}
+                <div x-cloak x-show="!existingImportRequestData.progress" class="">
+                    <div class="alert alert-danger">
+                        {{ __tr('Please use Template from Download contacts dialog') }}
+                    </div>
+                    <p>{{ __tr('You can import csv file with new contacts or existing updated.') }}</p>
                     <div class="alert alert-light">
                         <h3>{{ __tr('Conventions') }}</h3>
                         <h4>{{ __tr('Mobile Number') }}</h4>
                         {{ __tr('Mobile number treated as unique entity, it should be with country code without prefixing
                         0 or +, if the Mobile number is found in the records other information for the same will get
-                        updated with data from the excel.') }}
+                        updated with data from the csv file.') }}
                         <div class="mt-3">
                             <h4>{{ __tr('Group') }}</h4>
                             {{ __tr('Use comma separated group title, make sure groups are already exists into the
@@ -61,7 +81,7 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                     </div>
                     <div class="form-group ">
                         <input id="lwImportDocumentFilepond" type="file" data-allow-revert="true"
-                            data-label-idle="{{ __tr('Select XLSX File') }}" class="lw-file-uploader"
+                            data-label-idle="{{ __tr('Select CSV File') }}" class="lw-file-uploader"
                             data-instant-upload="true"
                             data-action="<?= route('media.upload_temp_media', 'vendor_contact_import') ?>"
                             data-file-input-element="#lwImportDocument" data-allowed-media='{{ getMediaRestriction('
@@ -69,30 +89,35 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                         <input id="lwImportDocument" type="hidden" value="" name="document_name" />
                     </div>
                 </div>
+                </div>
                 <!-- form footer -->
-                <div class="modal-footer">
+                <div x-cloak x-show="!existingImportRequestData.progress" class="modal-footer">
                     <!-- Submit Button -->
                     <button type="submit" class="btn btn-primary">{{ __tr('Process Import') }}</button>
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __tr('Close') }}</button>
+                    </div>
                 </div>
             </x-lw.form>
         </x-lw.modal>
         {{-- /import contacts --}}
         {{-- export contacts --}}
-        <x-lw.modal id="lwExportDialog" :header="__tr('Export Contacts')" :hasForm="true"
+        <x-lw.modal id="lwExportDialog" :header="__tr('Download Contacts')" :hasForm="true"
             data-pre-callback="appFuncs.clearContainer">
             <div class="lw-form-modal-body p-3">
                 <h5>{{ __tr('Export with Data') }}</h5>
-                <p>{{ __tr('You can export all contacts excel file and import it back with updated data.') }}</p>
+                <p>{{ __tr('You can export all contacts csv file and import it back with updated data.') }}</p>
                 <a href="{{ route('vendor.contact.write.export', [
-                    'exportType' => 'data'
-                ]) }}" data-method="post" class="btn btn-primary">{{ __tr('Export Excel File with Data') }}</a>
+                    'exportType' => 'data',
+                    'fileType' => 'csv',
+                ]) }}" data-method="post" class="btn btn-primary"><i class="fa fa-download"></i> {{ __tr('Download CSV File with Data') }}</a>
                 <hr>
-                <h5>{{ __tr('Blank Excel Template') }}</h5>
-                <p>{{ __tr('You can export blank excel file and fill with data according to column header and import it
+                <h5>{{ __tr('Blank CSV Template') }}</h5>
+                <p>{{ __tr('You can download blank csv file and fill with data according to column header and import it
                     for updates.') }}</p>
-                <a href="{{ route('vendor.contact.write.export') }}" data-method="post" class="btn btn-primary">{{
-                    __tr('Export Blank Template') }}</a>
+                <a href="{{ route('vendor.contact.write.export', [
+                    'exportType' => 'blank',
+                     'fileType' => 'csv',
+                ]) }}" data-method="post" class="btn btn-primary"> <i class="fa fa-download"></i> {{ __tr('Download CSV Blank Template') }}</a>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __tr('Close') }}</button>
@@ -132,7 +157,7 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                     <!-- Phone_Number -->
                     <x-lw.input-field type="number" id="lwPhoneNumberField" data-form-group-class=""
                         :label="__tr('Mobile Number')" name="phone_number" minlength="9"
-                        :helpText="__tr('Number should be with country code without 0 or +')" required="true" />
+                        :helpText="__tr('Number should be with country code without 0 or +')" required="true" maxlength="20" />
                     <!-- /Phone_Number -->
                     <!-- Language Code -->
                     <x-lw.input-field type="text" id="lwLanguageCodeField" data-form-group-class=""
@@ -160,6 +185,10 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                         <x-lw.checkbox id="lwAiBotEnable" :checked="getVendorSettings('default_enable_flowise_ai_bot_for_users')" name="enable_ai_bot" value="1" data-size="small" 
                             data-lw-plugin="lwSwitchery" :label="__tr('Enable AI Bot')" />
                         @endif
+                    </div>
+                    <div class="my-3">
+                        <x-lw.checkbox id="lwReplyBotEnable" :checked="true" name="enable_reply_bot" value="1" data-size="small" 
+                            data-lw-plugin="lwSwitchery" :label="__tr('Enable Reply Bot')" />
                     </div>
                     <fieldset>
                         <legend>{{ __tr('Other Information') }}</legend>
@@ -254,7 +283,8 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
             <!--/  Details Contact Form -->
         </x-lw.modal>
         <!--/ Edit Contact Modal -->
-         <!--Group description -->
+
+        <!--Group description -->
         <div class="ml-3">
             <p class="card-text">{{$groupDescription
             }}</p>
@@ -294,6 +324,15 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                     cancelButtonText: '{{ __tr('No') }}',
                     type: 'error'
                 });
+            }, deleteAllContacts() {
+                var that = this;
+                showConfirmation('{{ __tr('WARNING - All your contacts will be deleted permanently, Are you sure you want to delete all your contacts?') }}', function() {
+                    __DataRequest.post('{{ route('vendor.contacts.all.write.delete') }}', {});
+                }, {
+                    confirmButtonText: '{{ __tr('Yes') }}',
+                    cancelButtonText: '{{ __tr('No') }}',
+                    type: 'error'
+                });
             }, assignGroupsToSelectedContacts(){
                 var that = this;
                 __DataRequest.post('{{ route('vendor.contacts.selected.write.assign_groups') }}', {
@@ -313,15 +352,19 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                 }}</button>
             <div class="btn-group">
                 <button :class="!selectedContacts.length ? 'disabled' : ''"
-                    class="btn btn-danger mt-1 btn-sm dropdown-toggle lw-mobile-btn-block" type="button" data-toggle="dropdown"
+                    class="btn btn-danger mt-1 btn-sm dropdown-toggle" type="button" data-toggle="dropdown"
                     aria-expanded="false">
                     {{ __tr('Bulk Actions') }}
                 </button>
                 <div class="dropdown-menu">
                     <a class="dropdown-item" @click.prevent="deleteSelectedContacts" href="#">{{ __tr('Delete Selected Contacts') }}</a>
                     <a class="dropdown-item" data-toggle="modal" data-target="#lwAssignGroups" href="#">{{ __tr('Assign Group to Selected Contacts') }}</a>
+                    <a class="dropdown-item lw-ajax-link-action" data-toggle="modal" data-target="#lwAssignTeamMember" data-response-template="#lwAssignTeamMemberBody" href="{{ route('vendor.team_member.read.list', ['contactIdOrUid' => 'bulk_action']) }}">{{ __tr('Assign Team Member') }}</a>
                 </div>
             </div>
+            @if(!$groupUid)
+            <button class="btn btn-danger btn-sm my-2" @click.prevent="deleteAllContacts"><i class="fa fa-trash"></i> {{ __tr('Delete All Contact')}}</button>
+            @endif
             <!-- Assign Groups to the selected contacts -->
             <x-lw.modal id="lwAssignGroups" :header="__tr('Assign Groups to Selected Contacts')" :hasForm="true"
                 data-pre-callback="appFuncs.clearContainer">
@@ -349,6 +392,45 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                 <!--/  Add New Contact Form -->
             </x-lw.modal>
             <!--/ Assign Groups to the selected contacts -->
+
+            <!-- Assign Team Member Modal -->
+            <x-lw.modal id="lwAssignTeamMember" :header="__tr('Assign Team Member')" :hasForm="true">
+                <div id="lwAssignTeamMemberBody" class="lw-form-modal-body"></div>
+                <script type="text/template" id="lwAssignTeamMemberBody-template">                    
+                    <x-lw.form id="lwAssignTeamMemberForm" :action="route('vendor.chat.assign_user.process')"
+                        :data-callback-params="['modalId' => '#lwAssignTeamMember', 'datatableId' => '#lwContactList']"
+                        data-callback="appFuncs.modelSuccessCallback">
+                        <!-- form body -->
+                        <div class="lw-form-modal-body">
+                            <% if(__tData.is_bulk_action) { %>
+                                <input type="hidden" name="contactIdOrUid" :value="selectedContacts">
+                                <input type="hidden" name="bulk_action" :value="true">
+                            <% } else { %>
+                                <input type="hidden" name="contactIdOrUid" value="<%= __tData.contact._uid %>">
+                            <% } %>
+                            <x-lw.input-field type="selectize" data-lw-plugin="lwSelectize" id="lwSelectTeamMemberField"
+                            :label="__tr('Select Team Member')" name="assigned_users_uid" data-selected="<%= __tData?.contact?.assigned_user?._uid %>">
+                                <x-slot name="selectOptions">
+                                    <option value="no_one">{{ __tr('Unassigned') }}</option>
+                                    <% _.forEach(__tData.teamMembers, function(item) {%>
+                                        <option value="<%= item._uid %>">
+                                            <%= item.first_name %> <%= item.last_name %> <% if(item._uid == __tData.userUID) { %> ({{ __tr('You') }}) <% } %>
+                                        </option>
+                                    <% }); %>
+                                </x-slot>
+                            </x-lw.input-field>
+                        </div>
+                        <!-- form footer -->
+                        <div class="modal-footer">
+                            <!-- Submit Button -->
+                            <button type="submit" class="btn btn-primary">{{ __tr('Submit') }}</button>
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __tr('Close') }}</button>
+                        </div>
+                    </x-lw.form>
+                </script>
+            </x-lw.modal>
+            <!-- Assign Team Member Modal -->
+            
             <x-lw.datatable data-page-length="100" id="lwContactList" :url="route('vendor.contact.read.list', [
                 'groupUid' => $groupUid
             ])">
@@ -356,8 +438,8 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
                 <th data-name="none" data-template="#lwSelectMultipleContactsCheckbox">{{ __tr('Select') }}</th>
                 <th data-orderable="true" data-name="first_name">{{ __tr('First Name') }}</th>
                 <th data-orderable="true" data-name="last_name">{{ __tr('Last Name') }}</th>
-                <th data-name="phone_number">{{ __tr('Mobile Number') }}</th>
-                <th data-name="language_code">{{ __tr('Language Code') }}</th>
+                <th data-orderable="true" data-name="phone_number">{{ __tr('Mobile Number') }}</th>
+                <th data-orderable="true" data-name="language_code">{{ __tr('Language Code') }}</th>
                 <th data-orderable="true" data-name="created_at">{{ __tr('Created on') }}</th>
                 <th data-name="country_name">{{ __tr('Country') }}</th>
                 <th data-orderable="true" data-name="email">{{ __tr('Email') }}</th>
@@ -385,6 +467,15 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
  @if($currentGroup!=null)
   <a data-method="post" href="<%= __Utils.apiURL("{{ route('vendor.contact.write.remove',['contactIdOrUid', 'groupUid' => $groupUid]) }}",{ 'contactIdOrUid': __tData._uid }) %>" class="btn btn-warning btn-sm lw-ajax-link-action-via-confirm" data-confirm="#lwRemoveContact-template" title="{{ __tr('Remove contact from group') }}" data-callback-params="{{ json_encode(['datatableId' => '#lwContactList']) }}" data-callback="appFuncs.modelSuccessCallback"><i class="fa fa-user-times"></i> {{  __tr('Remove') }}</a> 
  @endif
+
+ <a data-pre-callback="appFuncs.clearContainer" title="{{  __tr('Assign') }}" class="lw-btn btn btn-sm btn-default lw-ajax-link-action" data-response-template="#lwAssignTeamMemberBody" href="<%= __Utils.apiURL("{{ route('vendor.team_member.read.list', [ 'contactIdOrUid']) }}", {'contactIdOrUid': __tData._uid}) %>" data-toggle="modal" data-target="#lwAssignTeamMember"><i class="fa fa-user-check"></i> {{  __tr('Assign') }}</a>
+
+ <% if (__tData.is_blocked) { %>
+    <a data-method="post" href="<%= __Utils.apiURL("{{ route('vendor.contact.write.unblock', [ 'contactIdOrUid']) }}", {'contactIdOrUid': __tData._uid}) %>" class="btn btn-danger btn-sm lw-ajax-link-action-via-confirm" data-confirm="#lwUnblockContact-template" title="{{ __tr('WA Unblock') }}" data-callback-params="{{ json_encode(['datatableId' => '#lwContactList']) }}" data-callback="appFuncs.modelSuccessCallback"><i class="fa fa-ban"></i> {{  __tr('WA Unblock') }}</a>
+<% } %>
+<% if(!__tData.is_blocked && __tData.is_direct_message_delivery_window_opened) { %>
+    <a data-method="post" href="<%= __Utils.apiURL("{{ route('vendor.contact.write.block', [ 'contactIdOrUid']) }}", {'contactIdOrUid': __tData._uid}) %>" class="btn btn-danger btn-sm lw-ajax-link-action-via-confirm" data-confirm="#lwBlockContact-template" title="{{ __tr('WA Block') }}" data-callback-params="{{ json_encode(['datatableId' => '#lwContactList']) }}" data-callback="appFuncs.modelSuccessCallback"><i class="fa fa-ban"></i> {{  __tr('WA Block') }}</a>
+<% } %>
  
  <!--  Remove Contact Action  -->
     </script>
@@ -393,23 +484,73 @@ $groupDescription = $groupUid ? $currentGroup->description : '';
         <script type="text/template" id="lwDeleteContact-template">
             <h2>{{ __tr('Are You Sure!') }}</h2>
             <p>{{ __tr('You want to delete this Contact permanently?') }}</p>
-    </script>
+        </script>
         <!-- /Contact delete template -->
+
          <!-- Contact remove template -->
          <script type="text/template" id="lwRemoveContact-template">
             <h2>{{ __tr('Are You Sure!') }}</h2>
             <p>{{ __tr('You want to remove this Contact from this group?') }}</p>
-    </script>
+        </script>
         <!-- /Contact remove template -->
+
+        <!-- Contact block template -->
+        <script type="text/template" id="lwBlockContact-template">
+            <h2>{{ __tr('Are You Sure!') }}</h2>
+            <p>{{ __tr('You want to block this Contact?') }}</p>
+        </script>
+        <!-- /Contact block template -->
+
+        <!-- Contact unblock template -->
+        <script type="text/template" id="lwUnblockContact-template">
+            <h2>{{ __tr('Are You Sure!') }}</h2>
+            <p>{{ __tr('You want to unblock this Contact?') }}</p>
+        </script>
+        <!-- /Contact unblock template -->
     </div>
 </div>
+<script>
+(function() {
+    'use strict';
+        document.addEventListener('alpine:init', () => {
+                Alpine.data('initialContactsInfoData', () => ({
+                    existingImportRequestData: @json(getVendorSettings('contacts_import_process_data') ?: []),
+            }));
+        });
+    })();
+</script>
 @push('appScripts')
 <script>
 (function($) {
     'use strict';
     window.onUpdateContactDetails = function(responseData, callbackParams) {
         appFuncs.modelSuccessCallback(responseData, callbackParams);
-    }
+    };
+    window.onImportProcessUpdate = function(responseData, callbackParams) {
+        if((responseData.reaction == 1) || (responseData === true)) {
+            if(_.get(responseData, 'data.progressCount') === 0) {
+                // close modal
+                appFuncs.modelSuccessCallback(responseData, callbackParams);
+            } else if(_.get(responseData, 'data.progressCount') || (responseData === true))  {
+                __DataRequest.post('{{ route('vendor.contact.write.import') }}', {
+                    'document_name': 'existing'
+                }, function(responseData) {
+                     _.delay(function() {
+                         window.onImportProcessUpdate(responseData, callbackParams);
+                    },30);
+                });
+            } else {
+                // close modal
+                appFuncs.modelSuccessCallback(responseData, callbackParams);
+            }
+        }
+    };
+    var existingImportRequestExist = {{ getVendorSettings('contacts_import_process_data') ? 1 : 0 }};
+    if(existingImportRequestExist) {
+        _.delay(function() {
+            window.onImportProcessUpdate(true);
+        },300);
+    };
 })(jQuery);
 </script>
 @endpush

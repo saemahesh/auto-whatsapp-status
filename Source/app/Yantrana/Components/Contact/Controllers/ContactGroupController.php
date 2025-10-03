@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * ContactGroupController.php - Controller file
 *
 * This file is part of the Contact component.
@@ -108,13 +126,28 @@ class ContactGroupController extends BaseController
      *---------------------------------------------------------------- */
     public function processGroupCreate(BaseRequest $request)
     {
-        validateVendorAccess('manage_contacts');
+        if($request->failed_campaign_type or $request->recampaign_type) {
+            validateVendorAccess('manage_campaigns');
+        } else {
+             validateVendorAccess('manage_contacts');
+        }
+       
         // process the validation based on the provided rules
         $request->validate([
             'title' => 'required',
         ]);
         // ask engine to process the request
         $processReaction = $this->contactGroupEngine->processGroupCreate($request->all());
+
+        if (!__isEmpty($request->get('campaign_id'))) {
+            return $this->responseAction(
+                $this->processResponse($processReaction),
+                $this->redirectTo('vendor.campaign.new.view', [
+                    $processReaction->message(),
+                    'success',
+                ])
+            );
+        }        
 
         // get back with response
         return $this->processResponse($processReaction);

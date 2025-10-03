@@ -1,4 +1,22 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
  * ConfigurationController.php - Controller file
@@ -278,7 +296,7 @@ class ConfigurationController extends BaseController
         try {
             $stripe = new \Stripe\StripeClient(config('cashier.secret')); // config('cashier.secret')
             $webhookCreated = $stripe->webhookEndpoints->create([
-            // https://laravel.com/docs/10.x/billing#handling-stripe-webhooks
+            // https://laravel.com/docs/12.x/billing#handling-stripe-webhooks
             // https://docs.stripe.com/api/webhook_endpoints/create
             // copied from /vendor/laravel/cashier/src/Console/WebhookCommand.php
             'enabled_events' => [
@@ -416,11 +434,19 @@ class ConfigurationController extends BaseController
             if ($response->successful()) {
                 // Decode JSON into an array
                 $availableAddons = $response->json();
+                $availableAddonsKeys = array_column($availableAddons, 'identifier');
                 foreach ($availableAddons as $availableAddon) {
                     if (isset($allAddons[$availableAddon['identifier']])) {
                         $allAddons[$availableAddon['identifier']] = arrayExtend($allAddons[$availableAddon['identifier']], $availableAddon);
                     } else {
                         $allAddons[$availableAddon['identifier']] = $availableAddon;
+                    }
+                }
+                if(isDemo()) {
+                    foreach ($allAddons as $addonKey => $addon) {
+                        if (isset($addon['identifier']) and !in_array($addon['identifier'], $availableAddonsKeys)) {
+                            unset($allAddons[$addonKey]);
+                        }
                     }
                 }
             }

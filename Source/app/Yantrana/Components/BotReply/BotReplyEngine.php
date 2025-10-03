@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * BotReplyEngine.php - Main component file
 *
 * This file is part of the BotReply component.
@@ -18,6 +36,7 @@ use App\Yantrana\Components\BotReply\Repositories\BotFlowRepository;
 use App\Yantrana\Components\BotReply\Repositories\BotReplyRepository;
 use App\Yantrana\Components\BotReply\Interfaces\BotReplyEngineInterface;
 use App\Yantrana\Components\Contact\Repositories\ContactCustomFieldRepository;
+use App\Yantrana\Components\Contact\Repositories\ContactRepository;
 
 class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
 {
@@ -47,6 +66,11 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
     protected $botFlowRepository;
 
     /**
+     * @var ContactRepository - Contact Repository
+     */
+    protected $contactRepository;
+
+    /**
       * Constructor
       *
       * @param  BotReplyRepository $botReplyRepository - BotReply Repository
@@ -64,12 +88,14 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
         MediaEngine $mediaEngine,
         WhatsAppServiceEngine $whatsAppServiceEngine,
         BotFlowRepository $botFlowRepository,
+        ContactRepository $contactRepository
     ) {
         $this->botReplyRepository = $botReplyRepository;
         $this->contactCustomFieldRepository = $contactCustomFieldRepository;
         $this->mediaEngine = $mediaEngine;
         $this->whatsAppServiceEngine = $whatsAppServiceEngine;
         $this->botFlowRepository = $botFlowRepository;
+        $this->contactRepository = $contactRepository;
     }
 
     /**
@@ -142,7 +168,8 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
                     $botReplyType = __tr('Media');
                 } elseif($rowData['__data']['interaction_message'] ?? null) {
                     $botReplyType = __tr('Interactive/Buttons');
-                    ;
+                } elseif ($rowData['__data']['template_message'] ?? null) {
+                    $botReplyType = __tr('Template Bot');
                 }
                 return $botReplyType;
             },
@@ -374,16 +401,36 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
                     'file_name' => $isProcessed->data('fileName'),
                 ]
             ];
+        } elseif($messageType == 'template') {
+
+            $testContactUid = getVendorSettings('test_recipient_contact');
+            $templateMessageSentProcess = $this->whatsAppServiceEngine->sendTemplateMessageProcess($request, $testContactUid, false, null, $vendorId, null);
+            if($templateMessageSentProcess->failed()) {
+                return $templateMessageSentProcess;
+            }
+            $inputData['reply_text'] = '__IGNORE__';
+            $inputData['__data'] = [
+                'template_message' => [
+                    'template_data' => $templateMessageSentProcess->data()
+                ]
+            ];
         }
+
         // ask to add record
         $engineResponse = $this->botReplyRepository->processTransaction(function () use (&$inputData, &$vendorId) {
             if ($botReply = $this->botReplyRepository->storeBotReply($inputData)) {
                 // if needs to validate message using by sending test message
                 if($inputData['validate_bot_reply'] ?? null) {
-                    $validateTestBotReply = $this->whatsAppServiceEngine->validateTestBotReply($botReply->_id);
-                    if($validateTestBotReply->success()) {
+                    // If reply text column value is __IGNORE__ then don't send test reply because its already sent.
+                    if ($inputData['reply_text'] === '__IGNORE__') {
                         return $this->botReplyRepository->transactionResponse(1, [], __tr('Bot Reply Created'));
+                    } else {
+                        $validateTestBotReply = $this->whatsAppServiceEngine->validateTestBotReply($botReply->_id);
+                        if($validateTestBotReply->success()) {
+                            return $this->botReplyRepository->transactionResponse(1, [], __tr('Bot Reply Created'));
+                        }
                     }
+                    
                     // if got any errors etc
                     return $this->botReplyRepository->transactionResponse($validateTestBotReply->reaction(), [], $validateTestBotReply->message());
                 }
@@ -495,10 +542,11 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
             ]);
         }
 
+        $isTemplateMessage = Arr::get($botReply, '__data.template_message');
         $messageType = $inputData['message_type'] ?? 'simple';
         $updateData = [
             'name' => $inputData['name'],
-            'reply_text' => $inputData['reply_text'] ?? '',
+            'reply_text' => $isTemplateMessage ? '__IGNORE__' : $inputData['reply_text'] ?? '',
         ];
         if(!$botFlowId) {
             $updateData['trigger_type'] = $request->trigger_type;
@@ -507,10 +555,28 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
         }
         // media message
         if($messageType == 'media') {
+
+            $mediaMessage = [
+                'caption' => $inputData['caption'] ?? '',
+            ];
+            // Check if new media uploaded
+            if (!__isEmpty(data_get($inputData, 'uploaded_media_file_name'))) {
+                $inputData['header_type'] = $inputData['media_header_type'];
+                $mediaLink = '';
+                $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $inputData['uploaded_media_file_name']], 'whatsapp_' . $inputData['header_type']);
+                if ($isProcessed->failed()) {
+                    return $isProcessed;
+                }
+                $mediaLink = $isProcessed->data('path');
+                $inputData['reply_text'] = '';
+
+                $mediaMessage['media_link'] = $mediaLink;
+                $mediaMessage['header_type'] = $inputData['header_type']; // "text", "image", "audio or "video"
+                $mediaMessage['file_name'] = $isProcessed->data('fileName');
+            }
+
             $updateData['__data'] = [
-                'media_message' => [
-                    'caption' => $inputData['caption'] ?? '',
-                ]
+                'media_message' => $mediaMessage
             ];
         } elseif($messageType == 'interactive') {
             $interactiveType = $inputData['interactive_type'] ?? 'button';
@@ -589,11 +655,15 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
                 // instead we have used it
                 Arr::set($botData, 'interaction_message.buttons', $updateData['__data']['interaction_message']['buttons']);
                 unset($updateData['__data']);
-                if($request->has('footer_text') and !$request->footer_text) {
+                if($request->has('footer_text') and !$request->footer_text and !__isEmpty(data_get($botData, 'interaction_message.footer_text'))) {
                     Arr::set($botData, 'interaction_message.footer_text', '');
+                    $updateData['__data'] = json_encode($botData);
+                    $isUpdated = $this->botReplyRepository->updateForListAndButtonMessage($botReply->_id, $updateData);
+                } else {
+                    Arr::set($botData, 'interaction_message.footer_text', $request->footer_text);
+                    $updateData['__data'] = $botData;
+                    $isUpdated = $this->botReplyRepository->updateIt($botReply, $updateData);
                 }
-                $updateData['__data'] = json_encode($botData);
-                $isUpdated = $this->botReplyRepository->updateForListAndButtonMessage($botReply->_id, $updateData);
             } elseif($interactiveType == 'list') {
                 $listDataSections =  $botReply->__data['interaction_message']['list_data']['sections'] ?? [];
                 $existingRowSubjects = [];
@@ -644,31 +714,47 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
                 // following type of method to update JSON creates problem for mariadb 
                 //  '__data->interaction_message->buttons' => $updateData['__data']['interaction_message']['buttons']
                 // instead we have used it
+                $existingFooterText = data_get($botData, 'interaction_message.footer_text');
                 Arr::set($botData, 'interaction_message', $updateData['__data']['interaction_message']);
                 unset($updateData['__data']);
-                if($request->has('footer_text') and !$request->footer_text) {
+                if($request->has('footer_text') and !$request->footer_text and !__isEmpty($existingFooterText)) {
                     Arr::set($botData, 'interaction_message.footer_text', '');
+                    $updateData['__data'] = json_encode($botData);
+                    $isUpdated = $this->botReplyRepository->updateForListAndButtonMessage($botReply->_id, $updateData);
+                } else {
+                    Arr::set($botData, 'interaction_message.footer_text', $request->footer_text);
+                    $updateData['__data'] = $botData;
+                    $isUpdated = $this->botReplyRepository->updateIt($botReply, $updateData);
                 }
-                $updateData['__data'] = json_encode($botData);
-                $isUpdated = $this->botReplyRepository->updateForListAndButtonMessage($botReply->_id, $updateData);
             } else {
-                $isUpdated = $this->botReplyRepository->updateIt($botReply, $updateData);
-                if($request->has('footer_text') and !$request->footer_text) {
-                    $isUpdated = $this->botReplyRepository->updateForListAndButtonMessage($botReply->_id, [
-                        '__data->interaction_message->footer_text' => ''
-                    ]);
+                if($request->has('footer_text') and !$request->footer_text and !__isEmpty(data_get($botData, 'interaction_message.footer_text'))) {
+                    $isUpdated = $this->botReplyRepository->updateForListAndButtonMessage($botReply->_id, $updateData);
+                } else {
+                    $isUpdated = $this->botReplyRepository->updateIt($botReply, $updateData);
                 }
             }
-            if ($isUpdated) {
-                if($request->validate_bot_reply) {
-                    $validateTestBotReply = $this->whatsAppServiceEngine->validateTestBotReply($botReply->_id);
-                    if($validateTestBotReply->success()) {
-                        return $this->botReplyRepository->transactionResponse(1, [], __tr('Bot Reply updated.'));
+            
+            if($isUpdated OR $request->validate_bot_reply) {
+
+                if ($request->validate_bot_reply) {
+                    // Check if updated bot is template bot
+                    if ($botReply->reply_text === '__IGNORE__') {
+                        $request->merge($botReply->__data['template_message']['template_data']['inputs']);
+                        $vendorId = getVendorId();
+                        $testContactUid = getVendorSettings('test_recipient_contact');
+                        $validateTestBotReply = $this->whatsAppServiceEngine->sendTemplateMessageProcess($request, $testContactUid, false, null, $vendorId, null);
+                    } else {
+                        $validateTestBotReply = $this->whatsAppServiceEngine->validateTestBotReply($botReply->_id);
                     }
-                    return $this->botReplyRepository->transactionResponse($validateTestBotReply->reaction(), [], $validateTestBotReply->message());
+                    
+                    if($validateTestBotReply->success()) {
+                        return $this->botReplyRepository->transactionResponse($validateTestBotReply->reaction(), [], $validateTestBotReply->message());
+                    }
                 }
+                
                 return $this->botReplyRepository->transactionResponse(1, [], __tr('Bot Reply updated.'));
             }
+            
             return $this->botReplyRepository->transactionResponse(2, [], __tr('Bot Reply Not updated.'));
         });
         // if bot flow
@@ -679,5 +765,91 @@ class BotReplyEngine extends BaseEngine implements BotReplyEngineInterface
             ]);
         }
         return $this->engineResponse($engineResponse);
+    }
+
+    /**
+      * Prepare All Active Bots
+      *
+      * @return  EngineResponse
+      *---------------------------------------------------------------- */
+
+    public function prepareAllActiveBots($contactIdOrUid)
+    {
+        $vendorId = getVendorId();
+        // fetch the record
+        $botReplies = $this->botReplyRepository->fetchItAll([
+            'status' => 1,
+            'vendors__id' => $vendorId
+        ], [
+            '_id',
+            '_uid',
+            'name',
+            'status'
+        ]);
+
+       // if successful
+        return $this->engineResponse(1, [
+            'bot_replies' => $botReplies,
+            'contactIdOrUid' => $contactIdOrUid
+        ]);
+    }
+
+    /**
+      * Prepare Bot Preview
+      *
+      * @return  EngineResponse
+      *---------------------------------------------------------------- */
+
+    public function prepareBotPreview($botIdOrUid, $contactIdOrUid)
+    {
+        $botReply = $this->botReplyRepository->fetchIt($botIdOrUid);
+
+        if (__isEmpty($botReply)) {
+            return $this->engineResponse(18, null, __tr('Bot not found.'));
+        }
+
+        $contact = $this->contactRepository->fetchIt($contactIdOrUid);
+
+        if (__isEmpty($contact)) {
+            return $this->engineResponse(18, null, __tr('Contact not found.'));
+        }
+
+        return $this->engineResponse(1, [
+            'previewContent' => $this->whatsAppServiceEngine->prepareAiBotPreviewData($botReply, $contact),
+        ]);
+    }
+
+    /**
+      * Prepare All Active Bots
+      *
+      * @return  EngineResponse
+      *---------------------------------------------------------------- */
+
+    public function processSendTestBotReply($botId, $contactIdOrUid)
+    {
+        $botReply = $this->botReplyRepository->fetchIt([
+            '_id' => $botId,
+            'vendors__id' => getVendorId(),
+        ]);
+
+        if (__isEmpty($botReply)) {
+            return $this->engineResponse(18, null, __tr('Bot Reply not found.'));
+        }
+
+        $contact = $this->contactRepository->fetchIt($contactIdOrUid);
+
+        if (__isEmpty($contact)) {
+            return $this->engineResponse(18, null, __tr('Contact not found.'));
+        }
+
+        $validateTestBotReply = $this->whatsAppServiceEngine->processReplyBot($contact, '', $botReply->_id, [
+            'isTriggerFromQuickReply' => true
+        ]);
+
+        if($validateTestBotReply->success()) {
+            return $this->engineResponse(1, null, __tr('Bot Quick Reply Send.'));
+        }
+
+        return $this->engineResponse(2, null, $validateTestBotReply->message());
     }
 }

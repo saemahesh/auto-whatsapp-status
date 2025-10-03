@@ -13,7 +13,7 @@
 											  <!-- Body content -->
                                               <div class="f-fallback">
                                               <br>
-                                              <strong style=" line-height: 40px;"><h1 style=" line-height: 45px;"><?=__tr('You have received the new subscription request from') ?> <?= e($userName) ?></h1></strong>
+                                              <strong style=" line-height: 40px;"><h1 style=" line-height: 45px;"><?= __tr('You have received the new subscription request from') ?> <?= e($userName) ?></h1></strong>
                                                 <br>
                                                 <strong><h2><?=__tr('Vendor Details') ?></h2></strong><br>
                                                 <strong><?= __tr('Vendor Title :') ?> </strong><?= e($userName) ?><br>

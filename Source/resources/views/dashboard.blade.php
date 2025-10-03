@@ -23,7 +23,7 @@
     </div>
     <div class="row">
         <div class="col mb-5 mb-xl-0">
-            <div class="card bg-gradient-default shadow">
+            <div class="card bg-dark shadow">
                 <div class="card-header bg-transparent">
                     <div class="row align-items-center">
                         <div class="col">

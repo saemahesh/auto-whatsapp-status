@@ -8,11 +8,11 @@ $modalDialogClass = $attributes->get('modal-dialog-class') ?? '';
 @endphp
 <!-- Modal -->
 <div data-backdrop="static" tabindex="-1" aria-labelledby="{!! $header !!}" aria-hidden="true"
-    {{ $attributes->merge(['class' => 'modal fade ' . ($hasForm ? 'lw-has-form' : '')]) }}>
+    {{ $attributes->merge(['class' => 'modal ' . ($hasForm ? 'lw-has-form' : '')]) }}>
     <div class="modal-dialog {{ $modalSize }} {{ $modalDialogClass }}">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">{!! $header !!}</h3>
+                <h3 class="modal-title" x-ref="modalTitle">{!! $header !!}</h3>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>

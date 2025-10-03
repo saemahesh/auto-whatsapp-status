@@ -38,9 +38,14 @@ h6,.h6,h5,.h5,h4,.h4,h3,.h3,h2,.h2,h1,.h1 {
         }
     }
 }
+
 .text-white {
     color: var(--lw-dark-blue-color) !important;
 }
+  .text-yellow{
+        color: #ffd600 !important;
+
+    }
 .lw-masthead-section {
     padding: 200px 0rem 60px 0rem;
     @media (max-width: 992px) {
@@ -387,6 +392,10 @@ footer {
 
 // light theme
 :root[data-theme='light'] {
+      .text-yellow{
+        color: #ffd600 !important;
+
+    }
    
     .bg-dark-blue {
         background-color: var(--lw-light-grey-color) !important;
@@ -532,7 +541,7 @@ footer {
         margin-right: 8px !important;
     }
 }
-// light theme
+// end of light theme
 
 // dark theme
 :root[data-theme='dark'] {
@@ -544,6 +553,7 @@ footer {
     .bg-dark-blue {
         background-color: var(--lw-dark-blue-color) !important;
     }
+   
     .lw-warning-text {
         color: #ffc107 !important;
     }
@@ -632,6 +642,7 @@ footer {
 
 // system default theme
 @media (prefers-color-scheme: dark) {
+  
     :root[data-theme='system_default'] {
         --lw-primary-color: #0660EA;
         --lw-white-color: #fff;
@@ -639,6 +650,13 @@ footer {
         --lw-dark-blue-color: #17182c;
         --lw-light-grey-color: #F2F5FC;
     }
+    .text-yellow{
+        color: #ffd600 !important;
+
+    }
+    .text-black{
+            color: var(--lw-white-color) !important;
+        }
     .bg-dark-blue {
         background-color: var(--lw-dark-blue-color) !important;
     }
@@ -699,7 +717,7 @@ footer {
     footer {
         background-color: var(--lw-dark-blue-color);
         .text-dark {
-            color: var(--lw-white-color) !important;
+            color: var(--lw-secondary-color) !important;
         }
         hr {
             background-color: var(--lw-secondary-color);
@@ -725,6 +743,38 @@ footer {
             font-weight: bold;
         }
     }
+       
+
+    // light theme
+:root[data-theme='light'] {
+      .text-yellow{
+        color: #ffd600 !important;
+
+    }
+     .dropdown-menu {
+        background: var(--lw-white-color);
+        .dropdown-item{
+            color: #1e1e25;
+            span i{
+                margin-right: 8px !important;
+            }
+            &:hover{
+                background-color: #b1b3ad;
+            }
+        }
+        & .text-dark{
+            color: var(--lw-white-color) !important;
+        }
+       
+        .dropdown-menu .active a {
+            background-color: #b1b3ad; /* or any color you prefer */
+            font-weight: bold;
+        }
+    }
+
+   
+   
+}
 }
 // system default theme
 

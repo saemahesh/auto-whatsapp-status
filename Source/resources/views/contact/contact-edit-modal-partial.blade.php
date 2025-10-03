@@ -51,6 +51,10 @@
     <input id="lwEnableAiChatBot" type="checkbox" <%- (!__tData.disable_ai_bot) ? 'checked' : '' %> name="enable_ai_bot" class="form-checkbox" data-size="small" data-lw-plugin="lwSwitchery"> <span class="ml-2 text-gray-600">{{  __tr('Enable AI Bot') }}</span>
     </label>
     @endif
+
+    <label for="lwEnableReplyChatBot" class="flex items-center my-3">
+    <input id="lwEnableReplyChatBot" type="checkbox" <%- (!__tData.disable_reply_bot) ? 'checked' : '' %> name="enable_reply_bot" class="form-checkbox" data-size="small" data-lw-plugin="lwSwitchery"> <span class="ml-2 text-gray-600">{{  __tr('Enable Reply Bot') }}</span>
+    </label>
     <fieldset>
         <legend>{{  __tr('Other Information') }}</legend>
         @foreach ($vendorContactCustomFields as $vendorContactCustomField)

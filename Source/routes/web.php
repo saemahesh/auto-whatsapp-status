@@ -591,6 +591,12 @@ Route::middleware([
                        'campaignExecutedLogListView',
                     ])->name('vendor.campaign.executed.log.list.view');
 
+                    //campaign expired queue log list view
+                    Route::get('/expired/{campaignUid}', [
+                        CampaignController::class,
+                        'campaignExpiredLogListView',
+                    ])->name('vendor.campaign.expired.log.list.view');
+
                     Route::get('/status/{campaignUid}/data', [
                         CampaignController::class,
                         'campaignStatusData',
@@ -633,7 +639,11 @@ Route::middleware([
                        CampaignController::class,
                        'processCampaignQueueLogReportGenerate',
                      ])->name('vendor.campaign.queue.log.report.write');
-
+                    // Campaign expired report generate
+                    Route::get('/campaign-expired-log-report/{campaignUid}', [
+                       CampaignController::class,
+                       'processCampaignExpiredLogReportGenerate',
+                    ])->name('vendor.campaign.expired.log.report.write');
                 });
 
                 // contact chat view
@@ -656,6 +666,12 @@ Route::middleware([
                     ContactController::class,
                     'assignChatUser',
                 ])->name('vendor.chat.assign_user.process');
+
+                // Team member list
+                Route::get("{contactIdOrUid}/team-member-list", [
+                    ContactController::class,
+                    'prepareTeamMemberList'
+                ])->name('vendor.team_member.read.list');
 
                 Route::post('/contact/chat/assign-labels', [
                     ContactController::class,
@@ -756,7 +772,7 @@ Route::middleware([
                     ])->name('vendor.whatsapp_service.templates.write.update');
 
                 });
-            });
+            }); 
 
 
             // BotReply Routes Group Start
@@ -802,6 +818,25 @@ Route::middleware([
                     BotReplyController::class,
                     'processBotReplyUpdate'
                 ])->name('vendor.bot_reply.write.update');
+                
+                // All Active Bots
+                Route::get("{contactIdOrUid}/all-active-bots", [
+                    BotReplyController::class,
+                    'getAllActiveBots'
+                ])->name('vendor.bot_reply.read.all.active.bots');
+
+                // Get bot preview
+                Route::get("{botIdOrUid}/{contactIdOrUid}/bot-preview", [
+                    BotReplyController::class,
+                    'getBotPreview'
+                ])->name('vendor.bot_reply.read.bot_preview');
+
+                // BotReply update process
+                Route::post("/quick-reply-process", [
+                    BotReplyController::class,
+                    'processBotQuickReply'
+                ])->name('vendor.bot_reply.write.quick-reply');
+
                 // BotFlow Routes Group Start
                 Route::prefix('/bot-flows')->group(function () {
                     // BotFlow list view
@@ -908,6 +943,16 @@ Route::middleware([
                 WhatsAppServiceController::class,
                 'updateBusinessProfile',
             ])->name('vendor.whatsapp.business_profile.write');
+
+            Route::get('/display-name/{phoneNumberId}', [
+                WhatsAppServiceController::class,
+                'getDisplayName',
+            ])->name('vendor.whatsapp.display_name.read');
+
+            Route::post('/display-name/update', [
+                WhatsAppServiceController::class,
+                'updateDisplayName',
+            ])->name('vendor.whatsapp.display_name.write');
 
             Route::post('/two-step-verification/update', [
                 WhatsAppServiceController::class,
@@ -1083,6 +1128,11 @@ Route::middleware([
                     ContactController::class,
                     'selectedContactsDelete',
                 ])->name('vendor.contacts.selected.write.delete');
+                // Delete All Contact
+                Route::post('/process-delete-all', [
+                    ContactController::class,
+                    'deleteAllContact',
+                ])->name('vendor.contacts.all.write.delete');
                 // assign group to selected contacts
                 Route::post('/assign-groups-selected-process', [
                     ContactController::class,
@@ -1112,7 +1162,7 @@ Route::middleware([
                     'toggleAiBot',
                 ])->name('vendor.contact.write.toggle_ai_bot');
 
-                Route::get('/export/{exportType?}', [
+                Route::get('/export/{exportType?}/{fileType?}', [
                     ContactController::class,
                     'exportContacts',
                 ])->name('vendor.contact.write.export');
@@ -1121,6 +1171,21 @@ Route::middleware([
                     ContactController::class,
                     'importContacts',
                 ])->name('vendor.contact.write.import');
+
+                Route::post('/abort-import', [
+                    ContactController::class,
+                    'abortImportContacts',
+                ])->name('vendor.contact.write.abort_import');
+
+                Route::post('/{contactIdOrUid}/block-process', [
+                    ContactController::class,
+                    'processContactBlock',
+                ])->name('vendor.contact.write.block');
+
+                Route::post('/{contactIdOrUid}/unblock-process', [
+                    ContactController::class,
+                    'processContactUnblock',
+                ])->name('vendor.contact.write.unblock');
 
                 // ContactCustomField Routes Group Start
                 Route::prefix('/custom-fields')->group(function () {

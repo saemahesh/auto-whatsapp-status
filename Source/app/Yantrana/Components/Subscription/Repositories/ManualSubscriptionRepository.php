@@ -1,9 +1,28 @@
 <?php
+
 /**
-* ManualSubscriptionRepository.php - Repository file
-*
-* This file is part of the Subscription component.
-*-----------------------------------------------------------------------------*/
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
+ * ManualSubscriptionRepository.php - Repository file
+ *
+ * This file is part of the Subscription component.
+ *-----------------------------------------------------------------------------*/
 
 namespace App\Yantrana\Components\Subscription\Repositories;
 
@@ -22,10 +41,10 @@ class ManualSubscriptionRepository extends BaseRepository implements ManualSubsc
 
 
     /**
-      * Fetch manualSubscription datatable source
-      *
-      * @return  mixed
-      *---------------------------------------------------------------- */
+     * Fetch manualSubscription datatable source
+     *
+     * @return  mixed
+     *---------------------------------------------------------------- */
     public function fetchManualSubscriptionDataTableSource($vendorId = null)
     {
         // basic configurations for dataTables data
@@ -41,22 +60,21 @@ class ManualSubscriptionRepository extends BaseRepository implements ManualSubsc
             ]
         ];
         // get Model result for dataTables
-        if($vendorId) {
+        if ($vendorId) {
             return ManualSubscriptionModel::where([
                 'vendors__id' => $vendorId
             ])->dataTables($dataTableConfig)->toArray();
         }
         return ManualSubscriptionModel::with('vendor')->dataTables($dataTableConfig)->toArray();
-
     }
 
     /**
-      * Delete $manualSubscription record and return response
-      *
-      * @param  object $inputData
-      *
-      * @return  mixed
-      *---------------------------------------------------------------- */
+     * Delete $manualSubscription record and return response
+     *
+     * @param  object $inputData
+     *
+     * @return  mixed
+     *---------------------------------------------------------------- */
 
     public function deleteManualSubscription($manualSubscription)
     {
@@ -67,5 +85,13 @@ class ManualSubscriptionRepository extends BaseRepository implements ManualSubsc
         }
         // if failed to delete
         return false;
+    }
+
+    function getCurrentActiveSubscription($vendorId)
+    {
+        return $this->primaryModel::where([
+            'vendors__id' => $vendorId,
+            'status' => 'active',
+        ])->latest()->first();
     }
 }

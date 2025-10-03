@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * WhatsAppMessageLogRepository.php - Repository file
 *
 * This file is part of the WhatsAppService component.
@@ -124,6 +142,8 @@ class WhatsAppMessageLogRepository extends BaseRepository implements WhatsAppMes
         ?string $repliedToMessage = null,
         ?bool $isForwarded = null,
         ?array $otherMessageData = null,
+        // useful when message get sent from WhatsApp Business App
+        ?bool $isActualIncomingMessage = true,
     ) {
         $additionalData = [
             'webhook_responses' => [
@@ -143,7 +163,7 @@ class WhatsAppMessageLogRepository extends BaseRepository implements WhatsAppMes
             'wamid' => $messageWamid,
             'status' => 'received',
             'message' => $message,
-            'is_incoming_message' => 1,
+            'is_incoming_message' => $isActualIncomingMessage ? 1 : 0,
             'vendors__id' => $vendorId,
             'contacts__id' => $contactId,
             '__data' => $additionalData,
@@ -288,6 +308,7 @@ class WhatsAppMessageLogRepository extends BaseRepository implements WhatsAppMes
         ];
         $query = $this->primaryModel::where([
             'vendors__id' => $vendorId,
+            'is_system_message' => null
         ]);
          if (isset($type) and ($type != 'all')) { // Use isset() to allow "0"
             $query->where('is_incoming_message',$type);

@@ -3,7 +3,7 @@
 namespace App\Yantrana\__Laraware\Core;
 
 /**
- *  __Laraware 1.x.x - Core Model - 1.7.10 - 21 DEC 2022
+ *  __Laraware 1.x.x - Core Model - 1.7.11 - 17 JUL 2025
  *
  * Base Model for Laravel applications
  *
@@ -176,7 +176,7 @@ abstract class CoreModel extends Eloquent
         $columns = $inputData['columns'];
         $order = isset($inputData['order']) ? $inputData['order'] : null;
 
-        $sortBy = $this->table.'.'.$this->primaryKey;
+        $sortBy = $this->table . '.' . $this->primaryKey;
         $sortOrder = 'asc';
 
         // if order not set
@@ -267,7 +267,7 @@ abstract class CoreModel extends Eloquent
                     $whereQuery->orWhere(
                         $searchableFieldName,
                         'like',
-                        '%'.$searchTerm.'%'
+                        '%' . $searchTerm . '%'
                     );
                 }
             });
@@ -311,11 +311,17 @@ abstract class CoreModel extends Eloquent
      *
      * @param  array  $input  - input array
      * @param bool/string $returnColumn - if you want ids of the inserted records
+     * @param array $options
      * @return bool|mixed|array
      *------------------------------------------------------------------------ */
-    public function prepareAndInsert($input, $returnColumn = false)
+    public function prepareAndInsert($input, $returnColumn = false, $options = [])
     {
-        $timestamp = new Datetime();
+        if ($this->timestamps) {
+            $timestamp = new Datetime();
+        }
+        $options = array_merge([
+            'json_checks' => true
+        ], $options);
         $preparedRecords = [];
         $itemUids = [];
 
@@ -335,7 +341,7 @@ abstract class CoreModel extends Eloquent
             foreach ($item as $itemKey => $itemValue) {
                 // process JSON data if exists
                 if (array_key_exists($itemKey, $this->jsonColumns)) {
-                    $item[$itemKey] = json_encode($this->verifyAndUpdateJsonColumnData($itemKey, $itemValue, false));
+                    $item[$itemKey] = $options['json_checks'] ? json_encode($this->verifyAndUpdateJsonColumnData($itemKey, $itemValue, false)) : json_encode($itemValue);
                 }
             }
 
@@ -478,7 +484,7 @@ abstract class CoreModel extends Eloquent
         $tableName = $this->table;
 
         $recordsUpdated = DB::transaction(function () use ($tableName, $data, $index, $jsonColumnKeys, $getItemsToUpdate, $whereConditions) {
-            $rawQueryString = 'update '.$tableName.' SET ';
+            $rawQueryString = 'update ' . $tableName . ' SET ';
             $updateData = [];
             $ids = $when = [];
             $cases = '';
@@ -502,8 +508,8 @@ abstract class CoreModel extends Eloquent
                             );
                         }
 
-                        $when[$field][] = 'WHEN '.$index
-                            .' = "'.$val[$index].'" THEN ? ';
+                        $when[$field][] = 'WHEN ' . $index
+                            . ' = "' . $val[$index] . '" THEN ? ';
 
                         $updateData[$field][] = $val[$field];
                         $ids[$field][] = DB::connection()->getPdo()->quote($val[$index]);
@@ -517,18 +523,18 @@ abstract class CoreModel extends Eloquent
 
             //generate the case statements with the keys and values from the when array
             foreach ($when as $k => $v) {
-                $cases .= "\n".$k.' = CASE '."\n";
+                $cases .= "\n" . $k . ' = CASE ' . "\n";
 
                 foreach ($v as $row) {
-                    $cases .= $row."\n";
+                    $cases .= $row . "\n";
                 }
-                $cases .= 'ELSE '.$k.' END, ';
+                $cases .= 'ELSE ' . $k . ' END, ';
             }
 
-            $rawQueryString .= substr($cases, 0, -2)."\n"; //remove the comma of the last case
+            $rawQueryString .= substr($cases, 0, -2) . "\n"; //remove the comma of the last case
             // old where in
             if (! empty($whereConditions)) {
-                $rawQueryString .= ' WHERE '.$whereConditions['key'].' = ( '.$whereConditions['value'].' )';
+                $rawQueryString .= ' WHERE ' . $whereConditions['key'] . ' = ( ' . $whereConditions['value'] . ' )';
             }
 
             return DB::update($rawQueryString, array_flatten($updateData));
@@ -782,7 +788,7 @@ abstract class CoreModel extends Eloquent
 
         foreach ($tempUpdates as $tempItemKey => $tempItemValue) {
             // get defined column item
-            $definedItem = array_get($this->jsonColumns, $key.'.'.$tempItemKey);
+            $definedItem = array_get($this->jsonColumns, $key . '.' . $tempItemKey);
             // data to update
             $updateItem = array_get($value, $tempItemKey);
             // get update item datatype
@@ -803,8 +809,8 @@ abstract class CoreModel extends Eloquent
             } else {
                 // if defined item is array so any values can be accepted for that particular item
                 foreach (array_dot($this->jsonColumns) as $jsonKey => $jsonValue) {
-                    $startWith = starts_with($key.'.'.$tempItemKey, $jsonKey);
-                    $searchedItemKey = str_replace($key.'.', '', $jsonKey);
+                    $startWith = starts_with($key . '.' . $tempItemKey, $jsonKey);
+                    $searchedItemKey = str_replace($key . '.', '', $jsonKey);
                     $searchedItemValue = array_get($value, $searchedItemKey);
 
                     if (($startWith === true)

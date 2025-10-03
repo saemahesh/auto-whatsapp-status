@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * CampaignController.php - Controller file
 *
 * This file is part of the Campaign component.
@@ -137,6 +155,8 @@ class CampaignController extends BaseController
         $gotoPage = 'queue';
         if(!$pageType and ($campaignDataResponse->data('campaignStatus') == 'executed') or ($pageType == 'executed')) {
             $gotoPage = 'executed';
+        } elseif ($pageType == 'expired') {
+            $gotoPage = 'expired';
         }
 
         $campaignDataResponse->updateData(
@@ -173,6 +193,19 @@ class CampaignController extends BaseController
     }
 
     /**
+      * list of expired queue log
+      *
+      * @return  json object
+      *---------------------------------------------------------------- */
+
+    public function campaignExpiredLogListView($campaignIdOrUid)
+    {
+        validateVendorAccess('manage_campaigns');
+        // respond with dataTables preparations
+        return $this->campaignEngine->prepareCampaignExpiredLogList($campaignIdOrUid);
+    }
+
+    /**
          * campaign Executed report
          *
          * @param string $campaignUid
@@ -194,5 +227,17 @@ class CampaignController extends BaseController
     {
         validateVendorAccess('manage_campaigns');
         return $this->campaignEngine->processGenerateQueueLogCampaignReport($campaignUid);
+    }
+
+    /**
+     * campaign Expired report
+     *
+     * @param string $campaignUid
+     * @return file
+     */
+    public function processCampaignExpiredLogReportGenerate($campaignUid = null)
+    {
+        validateVendorAccess('manage_campaigns');
+        return $this->campaignEngine->processGenerateExpiredLogCampaignReport($campaignUid);
     }
 }

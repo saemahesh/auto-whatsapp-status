@@ -1,15 +1,34 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
-* WhatsAppServiceEngine.php - Main component file
-*
-* This file is part of the WhatsAppService component.
-*-----------------------------------------------------------------------------*/
+ * WhatsAppServiceEngine.php - Main component file
+ *
+ * This file is part of the WhatsAppService component.
+ *-----------------------------------------------------------------------------*/
 
 namespace App\Yantrana\Components\WhatsAppService;
 
-use Exception;
 use Request;
+use Exception;
+use YesSecurity;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -20,6 +39,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use App\Events\VendorChannelBroadcast;
+use App\Jobs\ProcessMessageWebhookJob;
 use App\Jobs\ProcessCampaignMessagesJob;
 use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\Client\RequestException;
@@ -29,12 +49,14 @@ use App\Yantrana\Components\Vendor\VendorSettingsEngine;
 use App\Yantrana\Components\User\Repositories\UserRepository;
 use App\Yantrana\Components\Configuration\ConfigurationEngine;
 use App\Yantrana\Components\Contact\Repositories\LabelRepository;
+use App\Yantrana\Services\System\ServerPerformanceMonitorService;
 use App\Yantrana\Components\Contact\Repositories\ContactRepository;
 use App\Yantrana\Components\WhatsAppService\Services\OpenAiService;
 use App\Yantrana\Components\BotReply\Repositories\BotReplyRepository;
 use App\Yantrana\Components\Campaign\Repositories\CampaignRepository;
 use App\Yantrana\Components\Contact\Repositories\ContactGroupRepository;
 use App\Yantrana\Components\Contact\Repositories\GroupContactRepository;
+use App\Yantrana\Components\WhatsAppService\Models\WhatsAppWebhookModel;
 use App\Yantrana\Components\WhatsAppService\Services\WhatsAppApiService;
 use App\Yantrana\Components\Contact\Repositories\ContactCustomFieldRepository;
 use App\Yantrana\Components\WhatsAppService\Services\WhatsAppConnectApiService;
@@ -216,7 +238,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $vendorContactGroups = $this->contactGroupRepository->getActiveGroups($vendorId);
         // get all the labels
         $allLabels = $this->labelRepository->fetchItAll([
-           'vendors__id' => $vendorId
+            'vendors__id' => $vendorId
         ]);
         return $this->engineSuccessResponse([
             'contact' => null,
@@ -234,9 +256,9 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
      * @param  string|int  $whatsAppTemplateId
      * @return EngineResponse
      */
-    public function processTemplateChange($whatsAppTemplateId)
+    public function processTemplateChange($whatsAppTemplateId, $pageType)
     {
-        $preparedTemplateData = $this->prepareTemplate($whatsAppTemplateId);
+        $preparedTemplateData = $this->prepareTemplate($whatsAppTemplateId, ['pageType' => $pageType]);
 
         return $this->engineSuccessResponse([
             'template' => $preparedTemplateData['template'],
@@ -255,6 +277,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
     {
         $options = array_merge([
             'templateComponents' => null,
+            'pageType' => null
         ], $options);
         // useful for message
         if ($whatsAppTemplateId == 'for_message') {
@@ -266,6 +289,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             $templateComponents = Arr::get($whatsAppTemplate->toArray(), '__data.template.components');
         }
 
+        $templateType = data_get($templateComponents, '1.type');
         $bodyComponentText = '';
         $headerComponentText = '';
         $componentButtonText = '';
@@ -322,6 +346,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             ]);
         }, $matches[0]); // will contain all matched patterns
 
+        $contactDataMaps = getContactDataMaps();
         $templateDataPrepared = [
             'buttonItems' => $buttonItems,
             'templateComponents' => $templateComponents,
@@ -333,7 +358,10 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             'headerFormat' => $headerFormat,
             // for preview
             'bodyComponentText' => $bodyComponentText,
-            'contactDataMaps' => getContactDataMaps(),
+            'contactDataMaps' => $contactDataMaps,
+            'templateType' => $templateType,
+            'carouselTemplateData' => ($templateType == 'CAROUSEL') ? $templateComponents : [],
+            'pageType' => $options['pageType']
         ];
 
         if ($options['templateComponents']) {
@@ -550,9 +578,14 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $vendorPlanDetails = vendorPlanDetails('campaigns', $this->campaignRepository->countIt([
             'vendors__id' => $vendorId,
             [
-                'created_at', '>=', $currentBillingCycle['start'],
-            ], [
-                'created_at', '<=', $currentBillingCycle['end'],
+                'created_at',
+                '>=',
+                $currentBillingCycle['start'],
+            ],
+            [
+                'created_at',
+                '<=',
+                $currentBillingCycle['end'],
             ]
         ]), $vendorId);
 
@@ -576,6 +609,22 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         } else {
             $scheduleAt = now();
         }
+
+        $expireAt = $request->get('expire_at');
+        if (strlen($expireAt) == 16) {
+            $expireAt = $expireAt . ':00';
+        }
+        if ($expireAt) {
+            try {
+                $expireAtRawTime = Carbon::createFromFormat('Y-m-d\TH:i:s', $expireAt, $timezone);
+                $expireAt = $expireAtRawTime->setTimezone('UTC')->toDateTimeString();
+            } catch (\Throwable $th) {
+                return $this->engineFailedResponse([], __tr('Failed to recognize the datetime, please reload and try again.'));
+            }
+        } else {
+            $expireAt = null;
+        }
+
         $whatsAppTemplate = $this->whatsAppTemplateRepository->fetchIt($request->template_uid);
         abortIf(__isEmpty($whatsAppTemplate), null, __tr('Template not found in the system'));
         $contactGroupId = $request->contact_group;
@@ -638,6 +687,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $this->whatsAppMessageLogRepository->deleteIt([
             '_uid' => $isTestMessageProcessed->data('messageUid')
         ]);
+
         $campaign = $this->campaignRepository->storeIt([
             'status' => 1,
             'vendors__id' => $vendorId,
@@ -649,6 +699,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             'scheduled_at' => $scheduleAt,
             'timezone' => $timezone,
             '__data' => [
+                'expiry_at' => $expireAt,
                 'total_contacts' => $totalContacts,
                 'is_for_template_language_only' => $restrictByTemplateContactLanguage,
                 'is_for_opted_only_contacts' => $isOnlyForOptedContacts,
@@ -664,8 +715,18 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 ]
             ],
         ]);
+        if (__isEmpty($campaign)) {
+            return $this->engineFailedResponse([], __tr('Failed to create campaign'));
+        }
+
+        if(!app('akasmatTapasani')()) {
+            return $this->engineSuccessResponse([
+                'campaignUid' => $campaign->_uid
+            ], __tr('Test Message success and Campaign created'));
+        }
+
         $isSucceed = false;
-        $this->contactRepository->getContactsForCampaignInChunks($contactsWhereClause, $groupContactIds, $labelIds, function (Collection $contacts) use (&$request, &$isTestMessageProcessed, &$vendorId, &$whatsAppTemplate, &$scheduleAt, &$campaign, &$isSucceed) {
+        $this->contactRepository->getContactsForCampaignInChunks($contactsWhereClause, $groupContactIds, $labelIds, function (Collection $contacts) use (&$request, &$isTestMessageProcessed, &$vendorId, &$whatsAppTemplate, &$scheduleAt, &$campaign, &$isSucceed, &$expireAt) {
             $queueData = [];
             foreach ($contacts as $contact) {
                 // if number is missing don't process it further
@@ -683,6 +744,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                     'campaigns__id' => $campaign->_id,
                     'contacts__id' => $contact->_id,
                     '__data' => [
+                        'expiry_at' => $expireAt,
                         'contact_data' => [
                             '_id' => $contact->_id,
                             '_uid' => $contact->_uid,
@@ -695,7 +757,9 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 ];
                 // }
             }
-            if ($this->whatsAppMessageQueueRepository->storeItAll($queueData)) {
+            if (!empty($queueData) and $this->whatsAppMessageQueueRepository->storeItAll($queueData, false, [
+                'json_checks' => false
+            ])) {
                 $isSucceed = true;
             }
         });
@@ -720,14 +784,24 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
     }
 
     /**
-     * Process the queued messages
+     * Process the queued messages 
      *
      * @return EngineResponse
      */
     public function processCampaignSchedule()
     {
+        $monitor = new ServerPerformanceMonitorService();
+        if ($monitor->isCritical()) {
+            // if server is not in normal state then return
+            return $monitor->terminate();
+        }
         // set that cron job is done
-        if (!getAppSettings('cron_setup_using_artisan_at') and app()->runningConsoleCommand('schedule:run')) {
+        if (!getAppSettings('cron_setup_using_artisan_at') and app()->runningInConsole() and
+            (app()->runningConsoleCommand('schedule:run')
+                or app()->runningConsoleCommand('schedule:work')
+                or app()->runningConsoleCommand('whatsapp:campaign:process')
+                or app()->runningConsoleCommand('whatsapp:webhooks:process'))
+                ) {
             $this->configurationEngine->processConfigurationsStore('internals', [
                 'cron_setup_using_artisan_at' => now()
             ]);
@@ -739,16 +813,6 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         }
         // stuck in processing messages
         $stuckInProcessingMessages = $this->whatsAppMessageQueueRepository->stuckInProcessing();
-        if (getAppSettings('enable_queue_jobs_for_campaigns')) {
-            if ($stuckInProcessingMessages) {
-                $numberOfJobs = ceil($stuckInProcessingMessages / getAppSettings('cron_process_messages_per_lot'));
-                $numberOfJobs = $numberOfJobs + ceil($numberOfJobs * 0.1);
-                for ($i = 0; $i < $numberOfJobs; $i++) {
-                    ProcessCampaignMessagesJob::dispatch()->delay(now()->addMinutes(6));
-                }
-            }
-        }
-
         $queuedMessages = $this->whatsAppMessageQueueRepository->getQueueItemsForProcess();
         if (__isEmpty($queuedMessages)) {
             return $this->engineSuccessResponse([], __tr('Nothing to process'));
@@ -779,18 +843,27 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 'currentPhoneNumberId' => $currentPhoneNumberId,
             ];
         }
-        $responses = Http::pool(function (Pool $pool) use ($poolData) {
+         $counter = 0;
+        $responses = Http::pool(function (Pool $pool) use ($poolData, &$counter) {
             // Map each request to a pool get request
             $index = 1;
-            return array_map(function ($poolRequestItem) use (&$pool, &$index) {
+            return array_map(function ($poolRequestItem) use (&$pool, &$index, &$counter) {
                 if (!$poolRequestItem['queueUid']) {
                     return;
                 }
+
+                // Update message queue
                 $this->whatsAppMessageQueueRepository->updateIt($poolRequestItem['queueUid'], [
                     'status' => 3, // processing
                 ]);
+
                 // set the from number
                 fromPhoneNumberIdForRequest($poolRequestItem['currentPhoneNumberId']);
+                $counter++;
+                // 🕒 Respect rate limits
+                if (($counter % 50) === 0) {
+                    usleep(1000000); // wait 1 second
+                }
                 // prepare the request for pool
                 return $this->whatsAppApiService->sendTemplateMessageViaPool($pool, $poolRequestItem['queueUid'], $poolRequestItem['whatsAppTemplateName'], $poolRequestItem['whatsAppTemplateLanguage'], $poolRequestItem['phoneNumber'], $poolRequestItem['messageComponents'], $poolRequestItem['vendorId']);
             }, $poolData);
@@ -804,8 +877,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 continue;
             }
             try {
-
                 if (!method_exists($response, 'ok')) {
+                    $responseMessage =  $response->getMessage();
                     if ($poolRequestItem['retries'] > 5) {
                         $this->whatsAppMessageQueueRepository->updateIt($responseKey, [
                             'status' => 2, // error - do not requeue
@@ -829,6 +902,34 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                                 ]
                             ]
                         ]);
+                    } else {
+                        /**
+                         * @link https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes/
+                         */
+                        // If Cloud API message throughput has been reached we will try to process it again in 1 minute
+                        if (Str::contains($responseMessage, '130429')) {
+                            $this->whatsAppMessageQueueRepository->updateIt($poolRequestItem['queueUid'], [
+                                'status' => 1, // re queue
+                                'retries' => $poolRequestItem['retries'] + 1,
+                                'scheduled_at' => now()->addMinutes($poolRequestItem['retries'] + 1), // try in next one minute
+                                '__data' => [
+                                    'process_response' => [
+                                        'error_message' => $responseMessage,
+                                        'error_status' => 'requeued_rate_limit_hit',
+                                    ]
+                                ]
+                            ]);
+                        } else {
+                            $this->whatsAppMessageQueueRepository->updateIt($responseKey, [
+                                'status' => 2, // error - don not requeue
+                                '__data' => [
+                                    'process_response' => [
+                                        'error_message' => $responseMessage,
+                                        'error_status' => 'error_occurred',
+                                    ]
+                                ]
+                            ]);
+                        }
                     }
                     // back to next item
                     continue;
@@ -962,10 +1063,12 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
     public function sendTemplateMessageProcess($request, $contact, $isForCampaign = false, $campaignId = null, $vendorId = null, $whatsAppTemplate = null, $inputs = null)
     {
         $vendorId = $vendorId ?: getVendorId();
-        // check if vendor has active plan
-        $vendorPlanDetails = vendorPlanDetails(null, null, $vendorId);
-        if (!$vendorPlanDetails->hasActivePlan()) {
-            return $this->engineResponse(22, null, $vendorPlanDetails['message']);
+        if (!$isForCampaign) {
+            // check if vendor has active plan
+            $vendorPlanDetails = vendorPlanDetails(null, null, $vendorId);
+            if (!$vendorPlanDetails->hasActivePlan()) {
+                return $this->engineResponse(22, null, $vendorPlanDetails['message']);
+            }
         }
 
         $inputs = $inputs ?: $request->all();
@@ -983,6 +1086,10 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         if ($vendorId and (is_int($contact) or is_string($contact))) {
             $contact = $this->contactRepository->getVendorContact($contact, $vendorId);
         }
+        // if the contact not found may test contact is missing etc
+        if (__isEmpty($contact)) {
+            return $this->engineFailedResponse([], __tr('Contact not found'));
+        }
 
         $contactWhatsappNumber = $contact->whatsappNumber;
         $templateProforma = Arr::get($whatsAppTemplate->toArray(), '__data.template');
@@ -993,15 +1100,261 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $componentButtonText = '';
         $pattern = '/{{\d+}}/';
         $tempBodyParameters = [];
-        foreach ($templateComponents as $templateComponent) {
-            if ($templateComponent['type'] == 'HEADER') {
-                $headerFormat = $templateComponent['format'];
-                if ($headerFormat == 'TEXT') {
-                    $headerComponentText = $templateComponent['text'];
+        $messageComponents = [];
+        
+        if ($request->has('carousel_templates')) {
+            // __dd($templateComponents);
+            $contactId = $contact->_id;
+            $contactUid = $contact->_uid;
+            $componentValidations = [
+                'carousel_templates' => 'required|array|min:2',
+                'carousel_templates.*.uploaded_media_file_name' => 'required',
+            ];
+
+            $isBodyExists = false;
+            if (isset($templateComponents[0]['example'])) {
+                $isBodyExists = true;
+            }
+
+            $bodyParameters = [];
+            foreach ($inputs as $inputItemKey => $inputItemValue) {
+                if (Str::startsWith($inputItemKey, 'field_')) {
+                    $valueKeyName = str_replace('field_', '', $inputItemKey);
+                    $bodyParameters[] = [
+                        "type" => "text",
+                        "text" => $this->setParameterValue($contact, $inputs, $inputItemKey)                        
+                    ];
+
+                    if ($isBodyExists) {
+                        $componentValidations[$inputItemKey] = 'required';
+                    }
+                }
+            }
+
+            $cardData = [
+                "type" => "carousel"
+            ];
+
+            if (!__isEmpty($inputs['carousel_templates'])) {
+                foreach ($inputs['carousel_templates'] as $cardIndex => $carouselTemplate) {
+                    $mediaId = null;
+                    $headerType = $mediaUrl = '';
+                    $mediaSource = $header = [];
+                    // Check if input data have media id and url
+                    if (isset($inputs['carousel_templates'][$cardIndex]['uploaded_media_id'])
+                        and $inputs['carousel_templates'][$cardIndex]['uploaded_media_id']) {
+                        $mediaId = $inputs['carousel_templates'][$cardIndex]['uploaded_media_id'];
+                        if ($carouselTemplate['uploaded_media_file_type'] == 'IMAGE') {
+                            $headerType = 'image';
+                        } elseif ($carouselTemplate['uploaded_media_file_type'] == 'VIDEO') {
+                            $headerType = 'video';
+                        }
+                    } elseif (!isset($inputs['carousel_templates'][$cardIndex]['uploaded_media_id'])
+                            and !__isEmpty($carouselTemplate['uploaded_media_file_name'])) {
+                        if ($carouselTemplate['uploaded_media_file_type'] == 'IMAGE') {
+                            $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $carouselTemplate['uploaded_media_file_name']], 'whatsapp_image');
+                            if ($isProcessed->failed()) {
+                                return $isProcessed;
+                            }
+                            $mediaId = $this->whatsAppApiService->uploadMedia($isProcessed->data('filePath'), $isProcessed->data('fileMimeType'));
+                            $headerType = 'image';
+                            $mediaUrl = $isProcessed->data('path');
+                        } elseif ($carouselTemplate['uploaded_media_file_type'] == 'VIDEO') {
+                            $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $carouselTemplate['uploaded_media_file_name']], 'whatsapp_video');
+                            if ($isProcessed->failed()) {
+                                return $isProcessed;
+                            }
+                            $mediaId = $this->whatsAppApiService->uploadMedia($isProcessed->data('filePath'), $isProcessed->data('fileMimeType'));
+                            $headerType = 'video';
+                            $mediaUrl = $isProcessed->data('path');
+                        } else {
+                            return $this->engineFailedResponse([], __tr('Invalid media.'));
+                        }
+
+                        $inputs['carousel_templates'][$cardIndex]['uploaded_media_id'] = $mediaId;
+                        $inputs['carousel_templates'][$cardIndex]['uploaded_media_id_expiry_at'] = now()->addDays(29);
+                    }
+
+                    if (isset($inputs['carousel_templates'][$cardIndex]['uploaded_media_id'])
+                        and $inputs['carousel_templates'][$cardIndex]['uploaded_media_id']
+                        and isset($inputs['carousel_templates'][$cardIndex]['uploaded_media_id_expiry_at'])
+                        and Carbon::parse($inputs['carousel_templates'][$cardIndex]['uploaded_media_id_expiry_at'])->isFuture()) {
+                            $mediaSource['id'] = $mediaId;
+                            $mediaSource['link'] = $mediaUrl;
+                    }
+                    
+                    if ($mediaSource) {
+                        $header = [
+                            "type" => "header",
+                            "parameters" => [
+                                [
+                                    "type" => $headerType,
+                                    $headerType => $mediaSource
+                                ]
+                            ]
+                        ];
+                    }
+
+                    $body = [
+                        "type" => "body",
+                    ];
+
+                    if (!__isEmpty(data_get($carouselTemplate, 'body_example_fields'))) {
+                        $bodyExampleFieldData = [];
+                        foreach ($carouselTemplate['body_example_fields'] as $bodyExampleKey => $bodyExample) {
+                            $bodyExampleFieldData[] = [
+                                "type" => "text",
+                                "text" => $this->setParameterValue($contact, $carouselTemplate['body_example_fields'], $bodyExampleKey)
+                            ];
+                        }
+                        $body["parameters"] = $bodyExampleFieldData;
+                    }
+
+                    $buttons = [];
+                    
+                    if (!__isEmpty($carouselTemplate['button_type'])) {
+                        foreach ($carouselTemplate['button_type'] as $buttonIndex => $buttonType) {
+                            $buttonData = [];
+                            if ($buttonType == 'QUICK_REPLY') {
+                                $parameters = [];
+                                if (!__isEmpty(data_get($carouselTemplate, 'quick_reply_button_payload'))) {
+                                    $parameters[] = [
+                                        "type" => "payload",
+                                        "payload" => $carouselTemplate['quick_reply_button_payload']
+                                    ];
+                                }
+                                $buttonData = [
+                                    "type" => "button",
+                                    "sub_type" => "quick_reply",
+                                    "index" => $buttonIndex,
+                                ];
+
+                                if (!__isEmpty(($parameters))) {
+                                    $buttonData["parameters"] = $parameters;
+                                }
+                            }
+
+                            if ($buttonType == 'URL') {
+                                $parameters = [];
+                                if (!__isEmpty(data_get($carouselTemplate, 'button_example_field'))) {
+                                    $parameters[] = [
+                                        "type" => "text",
+                                        "text" => $carouselTemplate['button_example_field']
+                                    ];
+                                }
+                                $buttonData = [
+                                    "type" => "button",
+                                    "sub_type" => "url",
+                                    "index" => $buttonIndex,
+                                ];
+
+                                if (!__isEmpty(($parameters))) {
+                                    $buttonData["parameters"] = $parameters;
+                                }
+                            }
+
+                            if ($buttonType == 'PHONE_NUMBER') {
+                                $buttonData = [
+                                    "type" => "button",
+                                    "sub_type" => "voice_call",
+                                    "index" => $buttonIndex,
+                                ];
+                            }
+
+                            $buttons[] = $buttonData;
+                        }
+                    }
+                    
+                    $cardData['cards'][] = [
+                        "card_index" => $cardIndex,
+                        "components" => array_merge(
+                            [$header, $body],
+                            $buttons
+                        )
+                    ];
+                }
+            }
+
+            if (!__isEmpty($bodyParameters)) {
+                $messageComponents[] = [
+                    "type" => "body",
+                    "parameters" => $bodyParameters
+                ];
+            } else {
+                $messageComponents[] = [
+                    "type" => "body"
+                ];
+            }
+
+            $componentValidations['carousel_templates.*.body_example_fields.*'] = 'required';
+            
+            if (!$isForCampaign) {
+                $request->validate($componentValidations, [], [
+                    'carousel_templates.*.uploaded_media_file_name' => __tr('media file'),
+                    'carousel_templates.*.body_example_fields.*' => __tr('body example field')
+                ]);
+            }
+
+            $messageComponents[] = $cardData;
+
+        } else {
+            foreach ($templateComponents as $templateComponent) {
+                if ($templateComponent['type'] == 'HEADER') {
+                    $headerFormat = $templateComponent['format'];
+                    if ($headerFormat == 'TEXT') {
+                        $headerComponentText = $templateComponent['text'];
+                        // Find matches
+                        preg_match_all($pattern, $headerComponentText, $headerMatches);
+                        array_map(function ($item) use (&$componentValidations) {
+                            $item = 'header_field_' . strtr($item, [
+                                '{{' => '',
+                                '}}' => '',
+                            ]);
+                            $componentValidations[$item] = [
+                                'required',
+                            ];
+
+                            return $item;
+                        }, $headerMatches[0]); // will contain all matched patterns
+                    } elseif ($headerFormat == 'LOCATION') {
+                        $componentValidations['location_latitude'] = [
+                            'required',
+                            'regex:/^[-]?(([0-8]?[0-9])\.(\d+))|(90(\.0+)?)$/',
+                        ];
+                        $componentValidations['location_longitude'] = [
+                            'required',
+                            'regex:/^[-]?((((1[0-7][0-9])|([0-9]?[0-9]))\.(\d+))|180(\.0+)?)$/',
+                        ];
+                        $componentValidations['location_name'] = [
+                            'required',
+                            'string',
+                        ];
+                        $componentValidations['location_address'] = [
+                            'required',
+                            'string',
+                        ];
+                    } elseif ($headerFormat == 'IMAGE') {
+                        $componentValidations['header_image'] = [
+                            'required',
+                        ];
+                    } elseif ($headerFormat == 'VIDEO') {
+                        $componentValidations['header_video'] = [
+                            'required',
+                        ];
+                    } elseif ($headerFormat == 'DOCUMENT') {
+                        $componentValidations['header_document'] = [
+                            'required',
+                        ];
+                        $componentValidations['header_document_name'] = [
+                            'required',
+                        ];
+                    }
+                } elseif ($templateComponent['type'] == 'BODY') {
+                    $bodyComponentText = $templateComponent['text'];
                     // Find matches
-                    preg_match_all($pattern, $headerComponentText, $headerMatches);
-                    array_map(function ($item) use (&$componentValidations) {
-                        $item = 'header_field_' . strtr($item, [
+                    preg_match_all($pattern, $bodyComponentText, $matches);
+                    $tempBodyParameters = array_map(function ($item) use (&$componentValidations) {
+                        $item = 'field_' . strtr($item, [
                             '{{' => '',
                             '}}' => '',
                         ]);
@@ -1010,146 +1363,117 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                         ];
 
                         return $item;
-                    }, $headerMatches[0]); // will contain all matched patterns
-                } elseif ($headerFormat == 'LOCATION') {
-                    $componentValidations['location_latitude'] = [
-                        'required',
-                        'regex:/^[-]?(([0-8]?[0-9])\.(\d+))|(90(\.0+)?)$/',
-                    ];
-                    $componentValidations['location_longitude'] = [
-                        'required',
-                        'regex:/^[-]?((((1[0-7][0-9])|([0-9]?[0-9]))\.(\d+))|180(\.0+)?)$/',
-                    ];
-                    $componentValidations['location_name'] = [
-                        'required',
-                        'string',
-                    ];
-                    $componentValidations['location_address'] = [
-                        'required',
-                        'string',
-                    ];
-                } elseif ($headerFormat == 'IMAGE') {
-                    $componentValidations['header_image'] = [
-                        'required',
-                    ];
-                } elseif ($headerFormat == 'VIDEO') {
-                    $componentValidations['header_video'] = [
-                        'required',
-                    ];
-                } elseif ($headerFormat == 'DOCUMENT') {
-                    $componentValidations['header_document'] = [
-                        'required',
-                    ];
-                    $componentValidations['header_document_name'] = [
-                        'required',
-                    ];
-                }
-            } elseif ($templateComponent['type'] == 'BODY') {
-                $bodyComponentText = $templateComponent['text'];
-                // Find matches
-                preg_match_all($pattern, $bodyComponentText, $matches);
-                $tempBodyParameters = array_map(function ($item) use (&$componentValidations) {
-                    $item = 'field_' . strtr($item, [
-                        '{{' => '',
-                        '}}' => '',
-                    ]);
-                    $componentValidations[$item] = [
-                        'required',
-                    ];
-
-                    return $item;
-                }, $matches[0]); // will contain all matched patterns
-            } elseif ($templateComponent['type'] == 'BUTTONS') {
-                $btnIndex = 0;
-                foreach ($templateComponent['buttons'] as $templateComponentButton) {
-                    if ($templateComponentButton['type'] == 'URL' and (Str::contains($templateComponentButton['url'], '{{1}}'))) {
-                        $componentValidations["button_$btnIndex"] = [
-                            'required',
-                        ];
-                    } elseif ($templateComponentButton['type'] == 'COPY_CODE') {
-                        $componentValidations['copy_code'] = [
-                            'required',
-                            'alpha_dash',
-                        ];
-                    }
-                    $btnIndex++;
-                }
-            }
-        }
-        if (!$isForCampaign) {
-            $request->validate($componentValidations);
-        }
-        unset($componentValidations);
-
-        // process the data
-        // Regular expression to match {{number}}
-        $pattern = '/{{\d+}}/';
-        // Find matches
-        preg_match_all($pattern, $headerComponentText, $headerVariableMatches);
-        // $templateParameters = $matches[0]; // will contain all matched patterns
-        $headerParameters = array_map(function ($item) {
-            return 'header_field_' . strtr($item, [
-                '{{' => '',
-                '}}' => '',
-            ]);
-        }, $headerVariableMatches[0]); // will contain all matched patterns
-
-        preg_match_all($pattern, $componentButtonText, $buttonWordsMatches);
-        $buttonParameters = array_map(function ($item) {
-            return 'button_' . strtr($item, [
-                '{{' => '',
-                '}}' => '',
-            ]);
-        }, $buttonWordsMatches[0]); // will contain all matched patterns
-
-        $componentBodyIndex = 0;
-        $mainIndex = 0;
-        $componentBody = [];
-        $componentBody[$mainIndex] = [
-            'type' => 'body',
-            'parameters' => [],
-        ];
-        foreach ($inputs as $inputItemKey => $inputItemValue) {
-            if (Str::startsWith($inputItemKey, 'field_')) {
-                if (!in_array($inputItemKey, $tempBodyParameters)) {
-                    continue;
-                }
-                $valueKeyName = str_replace('field_', '', $inputItemKey);
-                $componentBody[$mainIndex]['parameters']["{{{$valueKeyName}}}"] = [
-                    'type' => 'text',
-                    'text' => $this->setParameterValue($contact, $inputs, $inputItemKey),
-                ];
-            }
-            $componentBodyIndex++;
-        }
-        $componentButtons = [];
-        $parametersComponentsCreations = [
-            'COPY_CODE',
-        ];
-        foreach ($templateComponents as $templateComponent) {
-            // @link https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages/#media-messages
-            // @link https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media#supported-media-types
-            if ($templateComponent['type'] == 'HEADER') {
-                if ($templateComponent['format'] == 'VIDEO') {
-                    $mainIndex++;
-                    if (isset($inputs['header_video']) and isValidUrl($inputs['header_video'])) {
-                        $inputs['whatsapp_video'] = $inputs['header_video'];
-                    } elseif (!isset($inputs['whatsapp_video'])) {
-                        $inputHeaderVideo = $inputs['header_video'];
-                        $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $inputHeaderVideo], 'whatsapp_video');
-                        if ($isProcessed->failed()) {
-                            return $isProcessed;
+                    }, $matches[0]); // will contain all matched patterns
+                } elseif ($templateComponent['type'] == 'BUTTONS') {
+                    $btnIndex = 0;
+                    foreach ($templateComponent['buttons'] as $templateComponentButton) {
+                        if ($templateComponentButton['type'] == 'URL' and (Str::contains($templateComponentButton['url'], '{{1}}'))) {
+                            $componentValidations["button_$btnIndex"] = [
+                                'required',
+                            ];
+                        } elseif ($templateComponentButton['type'] == 'COPY_CODE') {
+                            $componentValidations['copy_code'] = [
+                                'required',
+                                'alpha_dash',
+                            ];
                         }
+                        $btnIndex++;
+                    }
+                }
+            }
+            if (!$isForCampaign) {
+                $request->validate($componentValidations);
+            }
+            unset($componentValidations);
+
+            // process the data
+            // Regular expression to match {{number}}
+            $pattern = '/{{\d+}}/';
+            // Find matches
+            preg_match_all($pattern, $headerComponentText, $headerVariableMatches);
+            // $templateParameters = $matches[0]; // will contain all matched patterns
+            $headerParameters = array_map(function ($item) {
+                return 'header_field_' . strtr($item, [
+                    '{{' => '',
+                    '}}' => '',
+                ]);
+            }, $headerVariableMatches[0]); // will contain all matched patterns
+
+            preg_match_all($pattern, $componentButtonText, $buttonWordsMatches);
+            $buttonParameters = array_map(function ($item) {
+                return 'button_' . strtr($item, [
+                    '{{' => '',
+                    '}}' => '',
+                ]);
+            }, $buttonWordsMatches[0]); // will contain all matched patterns
+
+            $componentBodyIndex = 0;
+            $mainIndex = 0;
+            $componentBody = [];
+            $componentBody[$mainIndex] = [
+                'type' => 'body',
+                'parameters' => [],
+            ];
+            foreach ($inputs as $inputItemKey => $inputItemValue) {
+                if (Str::startsWith($inputItemKey, 'field_')) {
+                    if (!in_array($inputItemKey, $tempBodyParameters)) {
+                        continue;
+                    }
+                    $valueKeyName = str_replace('field_', '', $inputItemKey);
+                    $componentBody[$mainIndex]['parameters']["{{{$valueKeyName}}}"] = [
+                        'type' => 'text',
+                        'text' => $this->setParameterValue($contact, $inputs, $inputItemKey),
+                    ];
+                }
+                $componentBodyIndex++;
+            }
+            $componentButtons = [];
+            $parametersComponentsCreations = [
+                'COPY_CODE',
+            ];
+            foreach ($templateComponents as $templateComponent) {
+     
+                // @link https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages/#media-messages
+                // @link https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media#supported-media-types
+                if ($templateComponent['type'] == 'HEADER') {
+                    if ($templateComponent['format'] == 'VIDEO') {
+                        $mainIndex++;
+                        if (isset($inputs['header_video']) and isValidUrl($inputs['header_video'])) {
+                            $inputs['whatsapp_video'] = $inputs['header_video'];
+                        } elseif (!isset($inputs['whatsapp_video'])) {
+                            $inputHeaderVideo = $inputs['header_video'];
+                            $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $inputHeaderVideo], 'whatsapp_video');
+                            if ($isProcessed->failed()) {
+                                return $isProcessed;
+                            }
+                            $inputs['whatsapp_video'] = $isProcessed->data('path');
+                        }
+
                         $inputs['whatsapp_video'] = $isProcessed->data('path');
+                        $mediaUploadedId = $this->whatsAppApiService->uploadMedia($isProcessed->data('filePath'), $isProcessed->data('fileMimeType'));
+                        $inputs['whatsapp_video_media_id'] = $mediaUploadedId;
+                        $inputs['whatsapp_video_media_id_expiry_at'] = now()->addDays(29);
+                    
+                    $videoSource = [];
+        
+                    if (isset($inputs['whatsapp_video_media_id'])
+                        and $inputs['whatsapp_video_media_id']
+                        and isset($inputs['whatsapp_video_media_id_expiry_at'])
+                        and Carbon::parse($inputs['whatsapp_video_media_id_expiry_at'])->isFuture()) {
+                        $videoSource = [
+                            'id' => $inputs['whatsapp_video_media_id'],
+                        ];
+                    } else {
+                        $videoSource = [
+                            'link' => $inputs['whatsapp_video'],
+                        ];
                     }
                     $componentBody[$mainIndex] = [
                         'type' => 'header',
                         'parameters' => [
                             [
                                 'type' => 'video',
-                                'video' => [
-                                    'link' => $inputs['whatsapp_video'],
-                                ],
+                                'video' => $videoSource,
                             ],
                         ],
                     ];
@@ -1164,15 +1488,25 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                             return $isProcessed;
                         }
                         $inputs['whatsapp_image'] = $isProcessed->data('path');
+                        $mediaUploadedId = $this->whatsAppApiService->uploadMedia($isProcessed->data('filePath'), $isProcessed->data('fileMimeType'));
+                        $inputs['whatsapp_image_media_id'] = $mediaUploadedId;
+                        $inputs['whatsapp_image_media_id_expiry_at'] = now()->addDays(29);
+                    }
+                    $imageSource = [
+                        'link' => $inputs['whatsapp_image'],
+                    ];
+                    if (isset($inputs['whatsapp_image_media_id'])
+                        and $inputs['whatsapp_image_media_id']
+                        and isset($inputs['whatsapp_image_media_id_expiry_at'])
+                        and Carbon::parse($inputs['whatsapp_image_media_id_expiry_at'])->isFuture()) {
+                        $imageSource['id'] = $inputs['whatsapp_image_media_id'];
                     }
                     $componentBody[$mainIndex] = [
                         'type' => 'header',
                         'parameters' => [
                             [
                                 'type' => 'image',
-                                'image' => [
-                                    'link' => $inputs['whatsapp_image'],
-                                ],
+                                'image' => $imageSource,
                             ],
                         ],
                     ];
@@ -1187,17 +1521,26 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                             return $isProcessed;
                         }
                         $inputs['whatsapp_document'] = $isProcessed->data('path');
+                        $mediaUploadedId = $this->whatsAppApiService->uploadMedia($isProcessed->data('filePath'), $isProcessed->data('fileMimeType'));
+                        $inputs['whatsapp_document_media_id'] = $mediaUploadedId;
+                        $inputs['whatsapp_document_media_id_expiry_at'] = now()->addDays(29);
                     }
-
+                    $documentSource = [
+                        'filename' => $this->setParameterValue($contact, $inputs, 'header_document_name'),
+                        'link' => $inputs['whatsapp_document'],
+                    ];
+                    if (isset($inputs['whatsapp_document_media_id'])
+                        and $inputs['whatsapp_document_media_id']
+                    and isset($inputs['whatsapp_document_media_id_expiry_at'])
+                        and Carbon::parse($inputs['whatsapp_document_media_id_expiry_at'])->isFuture()) {
+                        $documentSource['id'] = $inputs['whatsapp_document_media_id'];
+                    }
                     $componentBody[$mainIndex] = [
                         'type' => 'header',
                         'parameters' => [
                             [
                                 'type' => 'document',
-                                'document' => [
-                                    'filename' => $this->setParameterValue($contact, $inputs, 'header_document_name'),
-                                    'link' => $inputs['whatsapp_document'],
-                                ],
+                                'document' => $documentSource,
                             ],
                         ],
                     ];
@@ -1216,72 +1559,146 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                                     'address' => $this->setParameterValue($contact, $inputs, 'location_address'),
                                 ],
                             ],
-                        ],
+                        ]
                     ];
-                } elseif (($templateComponent['format'] == 'TEXT') and Str::contains($templateComponent['text'], '{{1}}')) {
-                    // @link https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates
-                    $mainIndex++;
-                    $componentBody[$mainIndex] = [
-                        'type' => 'header',
-                        'parameters' => [
-                            [
-                                'type' => 'text',
-                                'text' => $this->setParameterValue($contact, $inputs, 'header_field_1'),
-                            ],
-                        ],
-                    ];
-                }
-            } elseif ($templateComponent['type'] == 'BUTTONS') {
-                $componentButtonIndex = 0;
-                $skipComponentsCreations = [
-                    // 'URL',
-                    'PHONE_NUMBER',
-                ];
-                foreach ($templateComponent['buttons'] as $templateComponentButton) {
-                    // or check if this type is skipped from components creations
-                    if (! in_array($templateComponentButton['type'], $skipComponentsCreations)) {
-                        // create component block
-                        $componentButtons[$mainIndex] = [
-                            'type' => 'button',
-                            'sub_type' => $templateComponentButton['type'],
-                            'index' => $componentButtonIndex,
-                            'parameters' => [],
-                        ];
-                        // create coupon code parameters
-                        if (in_array($templateComponentButton['type'], $parametersComponentsCreations)) {
-                            $componentButtons[$mainIndex]['parameters'][] = [
-                                'type' => 'COUPON_CODE',
-                                'coupon_code' => $this->setParameterValue($contact, $inputs, 'copy_code'),
-                            ];
-                        } elseif // create url parameters
-                        (in_array($templateComponentButton['type'], ['URL']) and Str::contains($templateComponentButton['url'], '{{1}}')) {
-                            $componentButtons[$mainIndex]['parameters'][] = [
-                                'type' => 'text',
-                                'text' => $this->setParameterValue($contact, $inputs, "button_$componentButtonIndex"),
-                            ];
-                        } elseif // flow button parameters
-                        (in_array($templateComponentButton['type'], ['FLOW'])) {
-                            $componentButtons[$mainIndex]['parameters'][] = [
-                                "type" => "action",
-                                'action' => [
-                                ]
-                            ];
+                    } elseif ($templateComponent['format'] == 'IMAGE') {
+                        $mainIndex++;
+                        if (isset($inputs['header_image']) and isValidUrl($inputs['header_image'])) {
+                            $inputs['whatsapp_image'] = $inputs['header_image'];
+                        } elseif (!isset($inputs['whatsapp_image'])) {
+                            $inputHeaderImage = $inputs['header_image'];
+                            $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $inputHeaderImage], 'whatsapp_image');
+                            if ($isProcessed->failed()) {
+                                return $isProcessed;
+                            }
+                            $inputs['whatsapp_image'] = $isProcessed->data('path');
                         }
+                        $componentBody[$mainIndex] = [
+                            'type' => 'header',
+                            'parameters' => [
+                                [
+                                    'type' => 'image',
+                                    'image' => [
+                                        'link' => $inputs['whatsapp_image'],
+                                    ],
+                                ],
+                            ],
+                        ];
+                    } elseif ($templateComponent['format'] == 'DOCUMENT') {
+                        $mainIndex++;
+                        $inputHeaderDocument = $inputs['header_document'];
+                        if (isset($inputs['header_document']) and isValidUrl($inputs['header_document'])) {
+                            $inputs['whatsapp_document'] = $inputs['header_document'];
+                        } elseif (!isset($inputs['whatsapp_document'])) {
+                            $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $inputHeaderDocument], 'whatsapp_document');
+                            if ($isProcessed->failed()) {
+                                return $isProcessed;
+                            }
+                            $inputs['whatsapp_document'] = $isProcessed->data('path');
+                        }
+
+                        $componentBody[$mainIndex] = [
+                            'type' => 'header',
+                            'parameters' => [
+                                [
+                                    'type' => 'document',
+                                    'document' => [
+                                        'filename' => $this->setParameterValue($contact, $inputs, 'header_document_name'),
+                                        'link' => $inputs['whatsapp_document'],
+                                    ],
+                                ],
+                            ],
+                        ];
+                    } elseif ($templateComponent['format'] == 'LOCATION') {
+                        // @link https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates/#location
+                        $mainIndex++;
+                        $componentBody[$mainIndex] = [
+                            'type' => 'header',
+                            'parameters' => [
+                                [
+                                    'type' => 'location',
+                                    'location' => [
+                                        'latitude' => $this->setParameterValue($contact, $inputs, 'location_latitude'),
+                                        'longitude' => $this->setParameterValue($contact, $inputs, 'location_longitude'),
+                                        'name' => $this->setParameterValue($contact, $inputs, 'location_name'),
+                                        'address' => $this->setParameterValue($contact, $inputs, 'location_address'),
+                                    ],
+                                ],
+                            ],
+                        ];
+                    } elseif (($templateComponent['format'] == 'TEXT') and Str::contains($templateComponent['text'], '{{1}}')) {
+                        // @link https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates
+                        $mainIndex++;
+                        $componentBody[$mainIndex] = [
+                            'type' => 'header',
+                            'parameters' => [
+                                [
+                                    'type' => 'text',
+                                    'text' => $this->setParameterValue($contact, $inputs, 'header_field_1'),
+                                ],
+                            ],
+                        ];
                     }
-                    $componentButtonIndex++;
-                    $mainIndex++;
+                    
+                } elseif ($templateComponent['type'] == 'BUTTONS') {
+                    $componentButtonIndex = 0;
+                    $skipComponentsCreations = [
+                        // 'URL',
+                        'PHONE_NUMBER',
+                    ];
+                    foreach ($templateComponent['buttons'] as $templateComponentButton) {
+                        // or check if this type is skipped from components creations
+                        if (! in_array($templateComponentButton['type'], $skipComponentsCreations)) {
+                            // create component block
+                            $componentButtons[$mainIndex] = [
+                                'type' => 'button',
+                                'sub_type' => $templateComponentButton['type'],
+                                'index' => $componentButtonIndex,
+                                'parameters' => [],
+                            ];
+                            // create coupon code parameters
+                            if (in_array($templateComponentButton['type'], $parametersComponentsCreations)) {
+                                $componentButtons[$mainIndex]['parameters'][] = [
+                                    'type' => 'COUPON_CODE',
+                                    'coupon_code' => $this->setParameterValue($contact, $inputs, 'copy_code'),
+                                ];
+                            } elseif // create url parameters
+                            (in_array($templateComponentButton['type'], ['URL']) and Str::contains($templateComponentButton['url'], '{{1}}')) {
+                                $componentButtons[$mainIndex]['parameters'][] = [
+                                    'type' => 'text',
+                                    'text' => $this->setParameterValue($contact, $inputs, "button_$componentButtonIndex"),
+                                ];
+                            } elseif // flow button parameters
+                            (in_array($templateComponentButton['type'], ['FLOW'])) {
+                                $componentButtons[$mainIndex]['parameters'][] = [
+                                    "type" => "action",
+                                    'action' => []
+                                ];
+                            }
+                        }
+                        $componentButtonIndex++;
+                        $mainIndex++;
+                    }
                 }
             }
-        }
-        // remove static links buttons
-        foreach ($componentButtons as $componentButtonKey => $componentButton) {
-            if (empty($componentButton['parameters'])) {
-                unset($componentButtons[$componentButtonKey]);
+            // remove static links buttons
+            foreach ($componentButtons as $componentButtonKey => $componentButton) {
+                if (empty($componentButton['parameters'])) {
+                    unset($componentButtons[$componentButtonKey]);
+                }
+            }
+            $messageComponents = array_merge($componentBody, $componentButtons);
+            $contactId = $contact->_id;
+            $contactUid = $contact->_uid;
+
+            if (function_exists('gc_collect_cycles')) {
+                // Collect garbage to free memory
+                // This is useful when processing large data sets
+                // to avoid memory leaks
+                // and ensure that memory is released.
+                gc_collect_cycles();
             }
         }
-        $messageComponents = array_merge($componentBody, $componentButtons);
-        $contactId = $contact->_id;
-        $contactUid = $contact->_uid;
 
         if ($isForCampaign) {
             return $this->engineSuccessResponse([
@@ -1303,6 +1720,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             'countries__id' => $contact->countries__id,
             'is_template_test_contact' => $request->is_template_test_contact
         ];
+
         $processedResponse = $this->sendActualWhatsAppTemplateMessage(
             $vendorId,
             $contactId,
@@ -1360,8 +1778,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             'header_text' => '',
             'body_text' => '',
             'footer_text' => '',
-            'buttons' => [
-            ],
+            'buttons' => [],
             'cta_url' => null,
         ], $vendorId);
         $messageWamid = Arr::get($sendMessageResult, 'messages.0.id');
@@ -1425,6 +1842,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $fromPhoneNumberId = null,
         $sendMessageResult = null,
     ) {
+        // sleep(2); // sleep for 2 seconds to avoid CPU overload
         $currentPhoneNumberId = $fromPhoneNumberId ?: getVendorSettings('current_phone_number_id', null, null, $vendorId);
         fromPhoneNumberIdForRequest($currentPhoneNumberId);
         // from number checks
@@ -1443,6 +1861,12 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             return $this->engineFailedResponse([], __tr('You can not send message to your WhatsApp API number.'));
         }
 
+        if(!app()->runningInConsole()) {
+            if(!app('chukichTapasit')()) {
+                return $this->engineFailedResponse([], __tr('Failed to send message'));
+            }
+        }
+
         if (!$sendMessageResult) {
             $sendMessageResult = $this->whatsAppApiService->sendTemplateMessage($whatsAppTemplateName, $whatsAppTemplateLanguage, $contactWhatsappNumber, $messageComponents, $vendorId);
         }
@@ -1456,8 +1880,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 'wa_id' => $contactWaId
             ]);
         }
-        // $messageResponseStatus = Arr::get($sendMessageResult, 'messages.0.message_status');
-        $messageResponseStatus = Arr::get($sendMessageResult, 'messages.0.id') ? 'accepted' : null;
+        $messageResponseStatus = Arr::get($sendMessageResult, 'messages.0.message_status');
+        // $messageResponseStatus = Arr::get($sendMessageResult, 'messages.0.id') ? 'accepted' : null;
         // store it into db
         $recordCreated = $this->whatsAppMessageLogRepository->storeIt([
             'vendors__id' => $vendorId,
@@ -1476,13 +1900,19 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 'template_component_values' => $messageComponents,
             ],
         ]);
-        if ($messageResponseStatus == 'accepted') {
-            return $this->engineSuccessResponse([
-                'messageUid' => $recordCreated->_uid,
-                'contactUid' => $contactUid,
-                'log_message' => $recordCreated,
-                'contact' => $this->contactRepository->fetchIt($contactUid),
-            ], __tr('Message processed for WhatsApp contact'));
+        if (($messageResponseStatus == 'accepted') or ($messageResponseStatus == 'held_for_quality_assessment')) {
+            return $this->engineSuccessResponse(
+                [
+                    'messageUid' => $recordCreated->_uid,
+                    'contactUid' => $contactUid,
+                    'log_message' => $recordCreated,
+                    'contact' => $this->contactRepository->fetchIt($contactUid),
+                ],
+                // response message
+                ($messageResponseStatus == 'held_for_quality_assessment')
+                    ? __tr('Message processed for WhatsApp contact')
+                    : __tr('Message held for quality assessment, it may sent or dropped at this point.')
+            );
         }
 
         return $this->engineFailedResponse([], __tr('Failed to process Message for WhatsApp contact. Status: __messageStatus__', [
@@ -1546,6 +1976,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             'assigned' => $assigned,
             'currentlyAssignedUserUid' => '',
             'isAiChatBotEnabled' => null,
+            'isReplyBotEnable' => null
             // 'assignedLabelIds' => [],
         ];
         if (!request()->ajax()) {
@@ -1579,6 +2010,17 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             // 'contacts' =>  $this->singleAsContactsData($contact->_uid)->data('contacts'),
             '@contacts' => 'extend'
         ]);
+
+        if (__isEmpty($contact->__data)) {
+            $contact->__data = [
+                'is_blocked' => false
+            ];
+        } elseif (!__isEmpty($contact->__data) && !Arr::has($contact->__data, 'is_blocked')) {
+            $contact->__data = array_merge($contact->__data, [
+                'is_blocked' => false
+            ]);
+        }
+        
         return $this->engineSuccessResponse(array_merge($dataToSend, [
             // check if received incoming message from contact in last 24 hours
             // the direct message won't be delivered if not received any message by user in last 24 hours
@@ -1599,6 +2041,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             // 'assigned' => $assigned,
             'currentlyAssignedUserUid' => $contact->assignedUser->_uid ?? '',
             'isAiChatBotEnabled' => !$contact->disable_ai_bot,
+            'isReplyBotEnable' => !$contact->disable_reply_bot,
             // 'vendorContactGroups' => $vendorContactGroups,
             // 'vendorContactCustomFields' => $vendorContactCustomFields,
             // 'allLabels' => $allLabels,
@@ -1625,12 +2068,15 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
 
         $this->hasMoreMessages = $resultOfMessages->hasMorePages();
         return $resultOfMessages->keyBy('_uid')->transform(function ($item, string $key) {
-            $item->message = $this->formatWhatsAppText($item->message);
+            if ($item->is_system_message == 1 and __isEmpty(($item->message))) {
+                $item->message = $this->formatSystemMessage(data_get($item->__data, 'system_message_data'));
+            } else {
+                $item->message = $this->formatWhatsAppText($item->message);
+            }            
             $item->template_message = null;
             if (! $item->message || Arr::get($item->__data, 'interaction_message_data')) {
-                $item->template_message = $this->compileMessageWithValues($item->__data);
-            }
-            ;
+                $item->template_message = $this->compileMessageWithValues($item->__data);          
+            };
             return $item;
         });
     }
@@ -1731,8 +2177,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                     'header_text' => '',
                     'body_text' => '',
                     'footer_text' => '',
-                    'buttons' => [
-                    ],
+                    'buttons' => [],
                 ], $messageData['interaction_message_data']),
             ])->render();
         } elseif (isset($messageData['media_values'])) {
@@ -1749,6 +2194,11 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         } elseif (isset($messageData['other_message_data'])) {
             return view('whatsapp-service.other-message-partial', [
                 'messageDataValues' => $messageData['other_message_data'],
+            ])->render();
+        } elseif ((isset($messageData['template_components'][1]['type'])) and ($messageData['template_components'][1]['type'] == 'CAROUSEL')) {
+            return view('whatsapp-service.carousel-template-message', [
+                'templateComponents' => $messageData['template_components'],
+                'templateComponentValues' => $messageData['template_component_values']
             ])->render();
         }
 
@@ -1769,8 +2219,10 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $buttonValues = [];
         foreach ($templateComponentValues as $templateComponentValue) {
             if ($templateComponentValue['type'] == 'body') {
-                foreach ($templateComponentValue['parameters'] as $templateComponentValueParameterKey => $templateComponentValueParameter) {
-                    $bodyItemValues[$templateComponentValueParameterKey] = $templateComponentValueParameter['text'];
+                if (isset($templateComponentValue['parameters'])) {
+                    foreach ($templateComponentValue['parameters'] as $templateComponentValueParameterKey => $templateComponentValueParameter) {
+                        $bodyItemValues[$templateComponentValueParameterKey] = $templateComponentValueParameter['text'];
+                    }
                 }
             } elseif ($templateComponentValue['type'] == 'header') {
                 foreach ($templateComponentValue['parameters'] as $templateComponentValueParameterKey => $templateComponentValueParameter) {
@@ -1903,6 +2355,13 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         if ($currentDisplayPhoneNumber == $contact->wa_id) {
             return $this->engineFailedResponse([], __tr('You can not send message to your WhatsApp API number.'));
         }
+
+
+        if (!app()->runningInConsole()) {
+            if (!app('anumanitNirikshan')()) {
+                return $this->engineFailedResponse([], __tr('Failed to send message'));
+            }
+        }
         $initializeLogMessage = null;
         // to show message in chat instantly we have created first log entry
         // only for chat box
@@ -1947,12 +2406,21 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             $rawUploadData = [];
             $caption = $request->caption ?? '';
             $mediaType = $request->media_type ?? '';
+            $mediaUploadedId = null;
+            $isNewMediaId = false;
             if ($mediaMessageData) {
                 $fileName = $mediaMessageData['file_name'];
                 $fileUrl = $mediaMessageData['media_link'];
                 $fileOriginalName = $mediaMessageData['file_name'];
                 $caption = $mediaMessageData['caption'];
                 $mediaType = $mediaMessageData['header_type'];
+                // check if media id is available and not expired
+                if (isset($mediaMessageData['media_id'])
+                    and $mediaMessageData['media_id']
+                    and isset($mediaMessageData['media_id_expiry_at'])
+                    and Carbon::parse($mediaMessageData['media_id_expiry_at'])->isFuture()) {
+                        $mediaUploadedId = $mediaMessageData['media_id'];
+                }
             } elseif (!isValidUrl($request->media_url)) {
                 $rawUploadData = json_decode($request->raw_upload_data, true);
                 $isProcessed = $this->mediaEngine->whatsappMediaUploadProcess(['filepond' => $request->uploaded_media_file_name], 'whatsapp_' . $mediaType);
@@ -1962,6 +2430,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 $fileUrl = $isProcessed->data('path');
                 $fileName = $isProcessed->data('fileName');
                 $fileOriginalName = Arr::get($rawUploadData, 'original_filename');
+                $mediaUploadedId = $this->whatsAppApiService->uploadMedia($isProcessed->data('filePath'), $isProcessed->data('fileMimeType'));
+                $isNewMediaId = true;
             } else {
                 $fileName = $request->file_name;
                 $fileUrl = $request->media_url;
@@ -1971,6 +2441,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             $mediaData = [
                 'type' => $mediaType,
                 'link' => $fileUrl,
+                'media_id' => $mediaUploadedId ?? null,
+                'media_id_expiry_at' => $isNewMediaId ? now()->addDays(29) : ($mediaMessageData['media_id_expiry_at'] ?? null), // media id expiry time
                 'caption' => $caption,
                 'mime_type' => Arr::get($rawUploadData, 'fileMimeType'),
                 'file_name' => $fileName,
@@ -2123,22 +2595,23 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         ], $options);
 
         $mediaMessageData = $options['mediaMessageData'] ?? null;
+        $isTriggerFromQuickReply = Arr::get($options, 'isTriggerFromQuickReply') ? false : true;
         return $this->processSendChatMessage(
             [
-            'contactUid' => $contactUid,
-            'messageBody' => $replyText,
-        ],
+                'contactUid' => $contactUid,
+                'messageBody' => $replyText,
+            ],
             $mediaMessageData ? true : false,
             $vendorId,
             [
-            'bot_reply' => true,
-            'ai_bot_reply' => $options['ai_bot_reply'] ?? false,
-            'ai_error_triggered' => $options['ai_error_triggered'] ?? false,
-            'media_message_data' => $mediaMessageData,
-            'interaction_message_data' => $interactionMessageData,
-            'from_phone_number_id' => $options['from_phone_number_id'],
-            'messageWamid' => $options['messageWamid'],
-        ]
+                'bot_reply' => $isTriggerFromQuickReply,
+                'ai_bot_reply' => $options['ai_bot_reply'] ?? false,
+                'ai_error_triggered' => $options['ai_error_triggered'] ?? false,
+                'media_message_data' => $mediaMessageData,
+                'interaction_message_data' => $interactionMessageData,
+                'from_phone_number_id' => $options['from_phone_number_id'],
+                'messageWamid' => $options['messageWamid'],
+            ]
         );
     }
 
@@ -2166,7 +2639,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
      *
      * @param Eloquent Object $contact
      * @param string $messageBody
-     * @return void
+     * @return object
      */
     public function processReplyBot($contact, $messageBody, $testBotId = null, $options = [])
     {
@@ -2176,6 +2649,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $options = array_merge([
             'fromPhoneNumberId' => null,
             'messageWamid' => null,
+            'isTriggerFromQuickReply' => null
         ], $options);
         // check if vendor has active plan
         $vendorPlanDetails = vendorPlanDetails(null, null, $contact->vendors__id);
@@ -2193,7 +2667,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 return $this->engineFailedResponse([], __tr('Message body is empty'));
             }
         }
-
+        
         $isBotTimingsEnabled = getVendorSettings('enable_bot_timing_restrictions', null, null, $contact->vendors__id);
         $isAiBotTimingsEnabled = getVendorSettings('enable_ai_bot_timing_restrictions', null, null, $contact->vendors__id);
         $isBotTimingsInTime = $this->isInAllowedBotTiming($contact->vendors__id);
@@ -2201,7 +2675,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         // search for only likewise records or welcome messages
         $allBotReplies = $this->botReplyRepository->getRelatedOrWelcomeBots($dataFetchConditions)->sortBy('priority_index');
         $isBotMatched = false;
-        if (!__isEmpty($allBotReplies)) {
+        
+        if ((!$contact->disable_reply_bot || $options['isTriggerFromQuickReply']) and !__isEmpty($allBotReplies)) {
             // check if we already have incoming message 2 days
             $isIncomingMessageExists = $this->whatsAppMessageLogRepository->countIt([
                 'vendors__id' => $contact->vendors__id,
@@ -2209,7 +2684,9 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 'is_incoming_message' => 1,
                 [
                     // send welcome message again after a day if there is no incoming response
-                    'created_at', '>', now()->subHours(24)
+                    'created_at',
+                    '>',
+                    now()->subHours(24)
                 ],
             ]) > 1;
             foreach ($allBotReplies as $botReply) {
@@ -2259,6 +2736,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                     $isBotMatchedForThisReply = false;
                     $interactionMessageData = $botReply->__data['interaction_message'] ?? null;
                     $mediaMessageData = $botReply->__data['media_message'] ?? null;
+                    $templateMessageData = $botReply->__data['template_message'] ?? null;
                     if ($botReply->trigger_type == 'welcome') {
                         if (!$isIncomingMessageExists or $testBotId) {
                             $replyText = $botReply->reply_text;
@@ -2357,11 +2835,43 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                             // caption text
                             $mediaMessageData['caption'] = $this->dynamicValuesReplacement($mediaMessageData['caption'], $contact);
                         }
-                        $sendReplyBotMessageResponse = $this->sendReplyBotMessage($contact->_uid, $replyText, $contact->vendors__id, $interactionMessageData, [
-                            'mediaMessageData' => $mediaMessageData,
-                            'from_phone_number_id' => $options['fromPhoneNumberId'],
-                            'messageWamid' => $options['messageWamid'],
-                        ]);
+
+                        // If ai bot is wa template message then get data from __data column
+                        if ($templateMessageData) {
+                            $contactsData = [
+                                '_id' => $contact->_id,
+                                '_uid' => $contact->_uid,
+                                'first_name' => $contact->first_name,
+                                'last_name' => $contact->last_name,
+                                'countries__id' => $contact->countries__id
+                            ];
+
+                            $templateData = Arr::get($templateMessageData, 'template_data.log_message.__data');
+                            $templateProforma = Arr::get($templateData, 'template_proforma');
+
+                            $sendReplyBotMessageResponse = $this->sendActualWhatsAppTemplateMessage(
+                                $contact->vendors__id,
+                                $contact->_id,
+                                $contact->wa_id,
+                                $contact->_uid,
+                                Arr::get($templateProforma, 'name'),
+                                Arr::get($templateProforma, 'language'),
+                                $templateProforma,
+                                $templateData['template_components'],
+                                $templateData['template_component_values'],
+                                null,
+                                $contactsData,
+                                null
+                            );
+                        } else {
+                            $sendReplyBotMessageResponse = $this->sendReplyBotMessage($contact->_uid, $replyText, $contact->vendors__id, $interactionMessageData, [
+                                'mediaMessageData' => $mediaMessageData,
+                                'from_phone_number_id' => $options['fromPhoneNumberId'],
+                                'messageWamid' => $options['messageWamid'],
+                                'isTriggerFromQuickReply' => $options['isTriggerFromQuickReply']
+                            ]);
+                        }
+
                         if ($testBotId) {
                             return $sendReplyBotMessageResponse;
                         }
@@ -2388,11 +2898,13 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             // open ai
             if (!$aiBotReplyText and getVendorSettings('enable_open_ai_bot', null, null, $contact->vendors__id) and getVendorSettings('open_ai_access_key', null, null, $contact->vendors__id)) {
                 try {
-                    $aiBotReplyText = app()->make(OpenAiService::class)->generateAnswerFromMultipleSections($messageBody, $contact->_uid, $contact->vendors__id);
+                    $aiBotReplyText = app()->make(OpenAiService::class)->generateAnswerFromMultipleSections($messageBody, $contact, $contact->vendors__id);
                     // check if got the reply
                     if ($aiBotReplyText) {
                         $botName = getVendorSettings('open_ai_bot_name', null, null, $contact->vendors__id);
-                        $aiBotReplyText =  $botName ? ($botName . ":\n\n" . $aiBotReplyText) : $aiBotReplyText ;
+                        if ($botName and !Str::startsWith($aiBotReplyText, $botName . ':')) {
+                            $aiBotReplyText =  $botName ? ($botName . ":\n\n" . $aiBotReplyText) : $aiBotReplyText;
+                        }
                         $this->sendReplyBotMessage($contact->_uid, $aiBotReplyText, $contact->vendors__id, null, [
                             'ai_bot_reply' => true,
                             'open_ai_reply' => true,
@@ -2401,6 +2913,10 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                         ]);
                     }
                 } catch (\Throwable $e) {
+                    // if openai issues
+                    if($e instanceof \OpenAI\Exceptions\ErrorException) {
+                        logSystemVendorChatMessage($contact, 'ERROR', $e->getMessage());
+                    }
                     __logDebug($e->getMessage());
                     // send error message to the customers
                     if (getVendorSettings('open_ai_failed_message', null, null, $contact->vendors__id)) {
@@ -2486,33 +3002,93 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         }
         return $listOutput;
     }
+    public function processWebhook($request, $vendorUid)
+    {
+        // __logDebug($request->all());
+        $monitor = new ServerPerformanceMonitorService();
+        if ($monitor->isCritical()) {
+            // if server is not in normal state then return
+            return $monitor->terminate();
+        }
+        // if not using db for webhook processing
+        // then process the webhook request directly
+        if (!getAppSettings('enable_wa_webhook_process_using_db')) {
+            return $this->processWebhookRequest($request, $vendorUid);
+        }
+        // if using db for webhook processing
+        // then store the webhook data
+        // and process it later
+        $vendorId = is_int($vendorUid) ? $vendorUid : getPublicVendorId($vendorUid);
+        if (! $vendorId) {
+            return false;
+        }
+        // Store the raw payload and headers
+        $webhookEntry = WhatsAppWebhookModel::create([
+            '_uid' => YesSecurity::generateUid(),
+            'payload' => $request->all(),
+            'headers' => $request->headers->all(),
+            'vendors__id' => $vendorId,
+        ]);
+        if (__isEmpty($webhookEntry)) {
+            return response()->json(['status' => 'failed'], 500);
+        }
+        if (getAppSettings('enable_queue_jobs_for_campaigns')) {
+            ProcessMessageWebhookJob::dispatch();
+        }
+        // response
+        return response()->json(['status' => 'success']);
+    }
     /**
      * Webhook for message handling
      *
      * @param Request $request
-     * @param string $vendorUid
+     * @param string|int $vendorUid
      * @return void
      */
-    public function processWebhook($request, $vendorUid)
+    public function processWebhookRequest($request, $vendorUid)
     {
-        $vendorId = getPublicVendorId($vendorUid);
+        emptyFlashCache(); // Clear flash cache before processing
+        $vendorId = is_int($vendorUid) ? $vendorUid : getPublicVendorId($vendorUid);
         if (! $vendorId) {
             return false;
+        }
+        if (is_int($vendorUid)) {
+            $vendorUid = getPublicVendorUid($vendorId);
         }
         // check if vendor has active plan
         $vendorPlanDetails = vendorPlanDetails(null, null, $vendorId);
         if (!$vendorPlanDetails->hasActivePlan()) {
-            abort(403, 'no active subscription');
+            // abort(403, 'no active subscription');
+            return false;
         }
         $messageEntry = $request->get('entry');
+        $webhookField = Arr::get($messageEntry, '0.changes.0.field');
+        switch ($webhookField) {
+            case 'account_update':
+                return $this->accountUpdateWebhook($messageEntry, $vendorId);
+                break;
+            case 'history':
+                return $this->historyWebhook($messageEntry, $vendorId);
+                // contacts sync
+            case 'smb_app_state_sync':
+                return $this->appContactSyncWebhook($messageEntry, $vendorId);
+                break;
+        }
         $phoneNumberId = Arr::get($messageEntry, '0.changes.0.value.metadata.phone_number_id');
         $messageStatusObject = Arr::get($messageEntry, '0.changes.0.value.statuses');
         $messageObject = Arr::get($messageEntry, '0.changes.0.value.messages');
+        $isFromBizAppReplied = false;
+        if (!$messageObject) {
+            $messageObject = Arr::get($messageEntry, '0.changes.0.value.message_echoes');
+            $isFromBizAppReplied = true;
+        }
         $messageStatus = null;
         $contactStatus = 'existing';
         // set the webhook messages field as configured if not already done
-        if (!getVendorSettings('webhook_messages_field_verified_at', null, null, $vendorUid)
-           and (Arr::get($messageEntry, '0.changes.0.field') == 'messages')) {
+        if (
+            !getVendorSettings('webhook_messages_field_verified_at', null, null, $vendorUid)
+            and (Arr::get($messageEntry, '0.changes.0.field') == 'messages')
+        ) {
             $this->vendorSettingsEngine->updateProcess('whatsapp_cloud_api_setup', [
                 'webhook_messages_field_verified_at' => now()
             ], $vendorId);
@@ -2535,7 +3111,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         $isNewIncomingMessage = false;
         $repliedToWamid = null;
         $messageLogEntry = null;
-        if(!$this->whatsAppMessageLogRepository) {
+        if (!$this->whatsAppMessageLogRepository) {
             $this->whatsAppMessageLogRepository = new WhatsAppMessageLogRepository();
         }
         if ($messageStatusObject) {
@@ -2547,17 +3123,17 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 'wamid' => $messageWamid,
                 'vendors__id' => $vendorId,
             ]);
-            // $logMessageEntry = $this->whatsAppMessageLogRepository->getMessageForVendor($messageWamid, $vendorId);
             if (__isEmpty($messageLogEntry)) {
-                abort(403, 'message does not found.');
+                // abort(403, 'message does not found.');
+                return false;
             }
-            // $contact = $this->contactRepository->getVendorContactByWaId($waId, $vendorId);
             $contact = $this->contactRepository->fetchIt([
                 'vendors__id' => $vendorId,
                 '_id' => $messageLogEntry->contacts__id,
             ]);
             if (__isEmpty($contact)) {
-                abort(403, 'contact does not found.');
+                // abort(403, 'contact does not found.');
+                return false;
             }
             $contactUid = $contact->_uid;
             // Update Record for sent message
@@ -2584,10 +3160,15 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             if (getVendorSettings('current_phone_number_id', null, null, $vendorId) != $phoneNumberId) {
                 if (empty($findPhoneNumber)) {
                     // return false;
-                    abort(403, 'from phone number not available.');
+                    // abort(403, 'from phone number not available.');
+                    return false;
                 }
             }
-            $waId = Arr::get($messageObject, '0.from');
+            if ($isFromBizAppReplied) {
+                $waId = Arr::get($messageObject, '0.to');
+            } else {
+                $waId = Arr::get($messageObject, '0.from');
+            }
             $messageWamid = Arr::get($messageObject, '0.id');
             $messageType = Arr::get($messageObject, '0.type');
             // welcome trigger
@@ -2602,7 +3183,11 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 return false;
             }
             $messageBody = null;
-            $isNewIncomingMessage = true;
+            if ($isFromBizAppReplied) {
+                $isNewIncomingMessage = false;
+            } else {
+                $isNewIncomingMessage = true;
+            }
             $mediaData = [];
             $otherMessageData = [];
             if (in_array($messageType, [
@@ -2610,7 +3195,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             ])) {
                 $messageBody = Arr::get($messageObject, '0.text.body');
             } elseif (in_array($messageType, [
-               'interactive',
+                'interactive',
             ])) {
                 $messageBody = Arr::get($messageObject, '0.interactive.button_reply.title');
                 if (!$messageBody) {
@@ -2688,7 +3273,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 ]), $vendorId);
                 if (!$vendorPlanDetails['is_limit_available']) {
                     // return false;
-                    abort(403, 'plan limit not available.');
+                    // abort(403, 'plan limit not available.');
+                    return false;
                 }
                 $profileName = Arr::get($messageEntry, '0.changes.0.value.contacts.0.profile.name');
                 $firstName = Arr::get(explode(' ', $profileName), '0');
@@ -2698,6 +3284,14 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                     'phone_number' => $waId,
                 ], $vendorId);
                 $contactStatus = 'new';
+            }
+            // check it again
+            if (__isEmpty($contact)) {
+                $contact = $this->contactRepository->getVendorContactByWaId($waId, $vendorId);
+                // if still not found
+                if (__isEmpty($contact)) {
+                    return false;
+                }
             }
             $contactUid = $contact->_uid;
             $hasLogEntryOfMessage = false;
@@ -2724,7 +3318,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                 $mediaData,
                 $repliedToMessage,
                 $isForwarded,
-                $otherMessageData
+                $otherMessageData,
+                $isNewIncomingMessage
             );
         }
         if ($messageWamid) {
@@ -2749,8 +3344,8 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
                     ]);
                     if (!__isEmpty($queueItem)) {
                         $itemRetries = $queueItem->retries ?: 1;
-                        // Marketing messages failed due to healthy echo to delivery we may reschedule it
-                        if ((Arr::get($messageStatusObject, '0.errors.0.code') == '131049') and ($itemRetries < 5)) {
+                        // Marketing messages failed due to healthy ecosystem to delivery we may reschedule it
+                        if (getAppSettings('enable_requeue_healthy_error_msg') and (Arr::get($messageStatusObject, '0.errors.0.code') == '131049') and ($itemRetries < 5)) {
                             $reScheduledAt = now()->addHours($itemRetries + 1);
                             $this->whatsAppMessageQueueRepository->updateIt($queueItem, [
                                 'status' => 1, // re queue
@@ -2837,8 +3432,99 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             return true;
         }
         // something may not available try again
-        abort(403, 'may not matched anything to process.');
+        // abort(403, 'may not matched anything to process.');
+        return false;
     }
+    /**
+     * Account updates via webhook
+     *
+     * @param array $request
+     * @param int $vendorId
+     * @return void
+     */
+    function accountUpdateWebhook($entry, $vendorId)
+    {
+        // PARTNER_REMOVED
+        $event = Arr::get($entry, '0.changes.0.value.event');
+        if ($event == 'PARTNER_REMOVED') {
+            if ($vendorId) {
+                $this->processDisconnectAccount($vendorId);
+            }
+        }
+    }
+    /**
+     * Contact sync via webhook
+     *
+     * @param array $entry
+     * @param int $vendorId
+     * @return void
+     */
+    function appContactSyncWebhook($entry, $vendorId)
+    {
+        $rawContacts = Arr::get($entry, '0.changes.0.value.state_sync');
+        $contacts = [];
+        $numbersToProcess = [];
+        foreach ($rawContacts as $rawContact) {
+            $numbersToProcess[] = $rawContact['contact']['phone_number'];
+        }
+
+        $vendorAllContacts = $this->contactRepository->with(['groups', 'customFieldValues'])->fetchItAll(
+            $numbersToProcess,
+            ['_id', '_uid', 'wa_id', 'disable_ai_bot'],
+            'wa_id',
+            [
+                // for this vendor
+                'where' => [
+                    'vendors__id' => $vendorId,
+                ]
+            ]
+        )?->keyBy('wa_id')?->toArray() ?: [];
+        foreach ($rawContacts as $rawContact) {
+            $numbersToProcess[] = $rawContact['contact']['phone_number'];
+            $firstName = Arr::get(explode(' ', $rawContact['contact']['full_name']), '0');
+            $phoneNumber = $rawContact['contact']['phone_number'];
+            $contactToUpdate = [
+                // '_uid' => (string) Str::uuid(),
+                'first_name' => $firstName,
+                'last_name' => str_replace($firstName, ' ', $rawContact['contact']['full_name']),
+                'wa_id' => $phoneNumber,
+                'vendors__id' => $vendorId,
+            ];
+            // $contactToUpdate['_uid'] = $vendorAllContacts[$phoneNumber]['_uid'] ?? (string) Str::uuid();
+            $contacts[] = [
+                '_uid' => $vendorAllContacts[$phoneNumber]['_uid'] ?? (string) Str::uuid(),
+                'first_name' => $firstName,
+                'last_name' => str_replace($firstName, ' ', $rawContact['contact']['full_name']),
+                'wa_id' => $phoneNumber,
+                'vendors__id' => $vendorId,
+            ];
+        }
+
+        if (!empty($contacts)) {
+            // check the feature limit
+            $vendorPlanDetails = vendorPlanDetails('contacts', $this->contactRepository->countIt([
+                'vendors__id' => $vendorId
+            ]) + count($contacts), $vendorId);
+            if (!$vendorPlanDetails['is_limit_available']) {
+                return false;
+            }
+            // update or create contacts
+            $this->contactRepository->bunchUpsert($contacts, [
+                'vendors__id',
+                'wa_id',
+            ]);
+        }
+    }
+    /**
+     * history updates via webhook
+     *
+     * @param array $request
+     * @param int $vendorId
+     * @return void
+     *
+     * @link https://developers.facebook.com/docs/whatsapp/embedded-signup/custom-flows/onboarding-business-app-users/#step-1--initiate-contacts-synchronization
+     */
+    function historyWebhook($entry, $vendorId) {}
     /**
      * Update the unread count via client model updates
      *
@@ -2942,7 +3628,26 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
     protected function formatWhatsAppText($text)
     {
         return formatWhatsAppText($text);
+    }
 
+    /**
+     * Format system message
+     *
+     * @param array $text
+     * @return string
+     */
+    protected function formatSystemMessage($systemMessageData) 
+    {
+        $message = '';
+        if (!__isEmpty($systemMessageData)) {
+            $action = configItem('system_message_actions', $systemMessageData['action']);
+            $dynamicKey = $systemMessageData['dynamicKey'];
+            $dynamicValue = $systemMessageData['dynamicValue'];
+
+            $message = strtr($action, [$dynamicKey => $dynamicValue]);
+        }
+
+        return $message;
     }
 
     public function setupWhatsAppEmbeddedSignUpProcess($request)
@@ -2989,6 +3694,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             'webhook_messages_field_verified_at',
             'whatsapp_phone_numbers_data',
             'whatsapp_onboarding_raw_data',
+            'whatsapp_token_info_data',
         ], $vendorId)->success()) {
             return $this->engineSuccessResponse([], __tr('Account has been disconnected successfully'));
         }
@@ -3106,12 +3812,12 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
     public function requestUpdateBusinessProfile($request)
     {
         $dataToUpdate = array_filter($request->only([
-          'address',
-          'description',
-          'vertical',
-          'about',
-          'email',
-          'websites',
+            'address',
+            'description',
+            'vertical',
+            'about',
+            'email',
+            'websites',
         ]));
         if ($request->uploaded_media_file_name) {
             $resumableUploadFileId = $this->whatsAppApiService->uploadResumableMedia($request->uploaded_media_file_name, [
@@ -3125,6 +3831,58 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
         }
         return $this->engineFailedResponse([], __tr('Failed to update Business Profile'));
     }
+
+    /**
+     * Request Display Name
+     *
+     * @param int $phoneNumberId
+     * @return EngineResponse
+     */
+    public function requestDisplayName($phoneNumberId)
+    {
+        $displayNameData = $this->whatsAppApiService->displayName($phoneNumberId);
+        $newDisplayNameData = $this->whatsAppApiService->newDisplayName($phoneNumberId);
+        $newNameStatus = data_get($newDisplayNameData, 'name_status', '-');
+        $newDisplayName = data_get($newDisplayNameData, 'new_display_name', '-');
+        $pendingRequestData = null;
+        // Check if new display name status is approved and display name are same
+        if (($newDisplayName != '-') and ($newDisplayName != ($displayNameData['verified_name'] ?? '')) and ($newNameStatus == 'APPROVED')) {
+            // update pin
+            $this->whatsAppApiService->requestTwoStepVerificationSet($phoneNumberId, [
+                'pin' => '123456',
+            ]);
+            // register phone
+            $this->whatsAppApiService->registerPhoneNumber($phoneNumberId, [
+                'messaging_product' => 'whatsapp',
+                'pin' => '123456',
+            ]);
+            $displayNameData = $this->whatsAppApiService->displayName($phoneNumberId);
+        } else {
+            $pendingRequestData = $newDisplayNameData;
+        }
+
+        return $this->engineSuccessResponse([
+            'phoneNumberId' => $phoneNumberId,
+            'displayNameData' => $displayNameData,
+            'pendingRequestData' => $pendingRequestData,
+        ]);
+    }
+
+    /**
+     * Update Display Name
+     *
+     * @param BaseRequestTwo $request
+     * @return EngineResponse
+     */
+    public function requestUpdateDisplayName($request)
+    {
+        $displayName = $this->whatsAppApiService->updateDisplayName($request);
+        if ($displayName['success'] ?? null) {
+            return $this->engineSuccessResponse([], __tr('Request to change display name has been submitted.'));
+        }
+        return $this->engineFailedResponse([], __tr('Failed to submit request to change display name.'));
+    }
+
     /**
      * Update WhatsApp Business Number Profile
      *
@@ -3134,7 +3892,7 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
     public function processTwoStepVerification($request)
     {
         $dataToUpdate = array_filter($request->only([
-          'pin',
+            'pin',
         ]));
 
         $isCodeReset = $this->whatsAppApiService->requestTwoStepVerificationSet($request->phoneNumberId, $dataToUpdate);
@@ -3182,61 +3940,58 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
 
         // required columns for DataTables
         $requireColumns = [
-         '_id',
-         '_uid',
+            '_id',
+            '_uid',
             'message',
-          'messageVia' => function ($rowData) {
-              $campaignId = $rowData['campaigns__id'] ?? null; // Ensure key exists and assign null if missing
-              // Ensure '__data' exists and is an array
-              $data = $rowData['__data'] ?? [];
+            'messageVia' => function ($rowData) {
+                $campaignId = $rowData['campaigns__id'] ?? null; // Ensure key exists and assign null if missing
+                // Ensure '__data' exists and is an array
+                $data = $rowData['__data'] ?? [];
 
-              // Ensure 'options' exists and is an array
-              $options = isset($data['options']) && is_array($data['options']) ? $data['options'] : [];
-              // Extract bot replies safely
-              $botReply = $options['bot_reply'] ?? '';
-              $aiBotReply = $options['ai_bot_reply'] ?? '';
+                // Ensure 'options' exists and is an array
+                $options = isset($data['options']) && is_array($data['options']) ? $data['options'] : [];
+                // Extract bot replies safely
+                $botReply = $options['bot_reply'] ?? '';
+                $aiBotReply = $options['ai_bot_reply'] ?? '';
 
-              if (!empty($aiBotReply)) {
-                  // If AI bot reply exists (even if botReply also exists), classify as AI Bot
-                  return 'aibot';
-              }
+                if (!empty($aiBotReply)) {
+                    // If AI bot reply exists (even if botReply also exists), classify as AI Bot
+                    return 'aibot';
+                }
 
-              if (!empty($botReply)) {
-                  // If only bot reply exists (and aiBotReply is empty), classify as Bot
-                  return 'bot';
-              }
+                if (!empty($botReply)) {
+                    // If only bot reply exists (and aiBotReply is empty), classify as Bot
+                    return 'bot';
+                }
 
-              if ($campaignId) {
-                  // fetch campaign
-                  $campaign = $this->campaignRepository->fetchIt($campaignId);
+                if ($campaignId) {
+                    // fetch campaign
+                    $campaign = $this->campaignRepository->fetchIt($campaignId);
 
-                  // Ensure '_uid' exists and return UID
-                  return $campaign['_uid'];
-              }
-              return null;
-
-          },
+                    // Ensure '_uid' exists and return UID
+                    return $campaign['_uid'];
+                }
+                return null;
+            },
             //type
             'is_incoming_message' => function ($rowData) {
 
                 //  return normal Incoming/Outgoing
                 return $rowData['is_incoming_message'] ? __tr('Incoming') : __tr('Outgoing');
-
             },
 
-        'status',
-           //sender
+            'status',
+            //sender
             'from' => function ($rowData) {
                 return $rowData['is_incoming_message'] ? $rowData['contact_wa_id'] : $rowData['wab_phone_number_id'];
             },
-          //receiver
+            //receiver
             'recepient' => function ($rowData) {
                 return $rowData['is_incoming_message'] ? $rowData['wab_phone_number_id'] : $rowData['contact_wa_id'];
             },
-         //messaged at
+            //messaged at
             'messaged_at' => function ($rowData) {
                 return $rowData['messaged_at'] === null ? '-' : formatDateTime($rowData['messaged_at']);
-
             },
         ];
 
@@ -3245,11 +4000,11 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
     }
 
     /**
-    * Message  data
-    *
-    * @param  mix  $messageIdOrUid
-    * @return EngineResponse
-    *---------------------------------------------------------------- */
+     * Message  data
+     *
+     * @param  mix  $messageIdOrUid
+     * @return EngineResponse
+     *---------------------------------------------------------------- */
     public function prepareMessageUpdateData($messageIdOrUid)
     {
         $message = $this->whatsAppMessageLogRepository->fetchIt($messageIdOrUid);
@@ -3267,7 +4022,72 @@ class WhatsAppServiceEngine extends BaseEngine implements WhatsAppServiceEngineI
             $message->template_message = $this->compileMessageWithValues($message->__data);
         }
         return $this->engineSuccessResponse([
-        'messageData' => $message,
+            'messageData' => $message,
         ]);
+    }
+
+    public function prepareAiBotPreviewData($botReply, $contact)
+    {
+        $replyText = $botReply->reply_text;
+        $interactionMessageData = $botReply->__data['interaction_message'] ?? null;
+        $mediaMessageData = $botReply->__data['media_message'] ?? null;
+        $templateMessageData = $botReply->__data['template_message'] ?? null;
+
+        if ($replyText) {
+            $replyText = $this->dynamicValuesReplacement($replyText, $contact);
+        }
+        // if interaction message
+        if ($interactionMessageData) {
+            // body text
+            $interactionMessageData['body_text'] = $replyText;
+            // header text assignments
+            if ($interactionMessageData['header_text']) {
+                $interactionMessageData['header_text'] = $this->dynamicValuesReplacement($interactionMessageData['header_text'], $contact);
+            }
+            // footer text assignments
+            if ($interactionMessageData['footer_text']) {
+                $interactionMessageData['footer_text'] = $this->dynamicValuesReplacement($interactionMessageData['footer_text'], $contact);
+            }
+        } elseif ($mediaMessageData) {
+            // caption text
+            $mediaMessageData['caption'] = $this->dynamicValuesReplacement($mediaMessageData['caption'], $contact);
+        } elseif ($templateMessageData) {
+            $templatePreview = $this->prepareTemplate($templateMessageData['template_data']['inputs']['template_uid'], ['pageType' => 'bot_reply_form']);
+            return $templatePreview['template'];
+        }
+
+        $renameKeyArray = [
+            'media_link' => 'link',
+            'header_type' => 'type'
+        ];
+
+        if (__isEmpty($interactionMessageData) and __isEmpty($mediaMessageData) and __isEmpty($templateMessageData)) {
+            return "<div class='p-2 lw-plain-message-text'>$replyText</div>";
+        }
+
+        return $this->compileMessageWithValues([
+            'interaction_message_data' => $interactionMessageData,
+            'media_values' => $this->renameArrayKey($mediaMessageData, $renameKeyArray)
+        ]);
+    }
+
+    protected function renameArrayKey($originalArray, $renameKeyArray)
+    {
+        if (__isEmpty($originalArray)) {
+            return null;
+        }
+
+        $newArray = [];
+        foreach ($originalArray as $key => $value) {
+            // Check if key needs to be renamed
+            if (array_key_exists($key, $renameKeyArray)) {
+                $newKey = $renameKeyArray[$key];
+                $newArray[$newKey] = $value;
+            } else {
+                $newArray[$key] = $value;
+            }
+        }
+
+        return $newArray;
     }
 }

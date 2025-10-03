@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Core Helper - 1.20.50 - 09 DEC 2024
+ * Core Helper - 1.20.52 - 23 JUN 2024
  *
  * Common helper functions for Laravel applications
  *
@@ -87,7 +87,7 @@ if (! function_exists('redirectViaPost')) {
 
         foreach ($postData as $key => $value) {
             if (is_numeric($value) or is_string($value)) {
-                $postFieldString .= '<input type="hidden" name="'.$key.'" value="'.$value.'">';
+                $postFieldString .= '<input type="hidden" name="' . $key . '" value="' . $value . '">';
             } else {
                 throw new Exception('value should be numeric or string');
             }
@@ -214,13 +214,13 @@ if (! function_exists('__dd')) {
 
         if (isset($backtrace[0])) {
             // if the using Homestead
-            $backtrace[0]['file'] = $editor.'://file/'.str_replace(env('IGNITION_REMOTE_SITES_PATH', '/home/vagrant/code'), env('IGNITION_LOCAL_SITES_PATH', '/Volumes/DATA-HD/__HTDOCS'), $backtrace[0]['file']).':'.$backtrace[0]['line'];
-            $args['debug_backtrace'] = $backtrace[0]['file'].'#';
+            $backtrace[0]['file'] = $editor . '://file/' . str_replace(env('IGNITION_REMOTE_SITES_PATH', '/home/vagrant/code'), env('IGNITION_LOCAL_SITES_PATH', '/Volumes/DATA-HD/__HTDOCS'), $backtrace[0]['file']) . ':' . $backtrace[0]['line'];
+            $args['debug_backtrace'] = $backtrace[0]['file'] . '#';
         }
 
         if ((Request::ajax() === false) or (isExternalApiRequest())) {
             if (!isExternalApiRequest()) {
-                echo '<a style="background: lightcoral;font-family: monospace;padding: 4px 8px;border-radius: 4px;font-size: 12px;color: white;text-decoration: none;" href="'.$backtrace[0]['file'].'">Open in Editor ('.$editor.')</a>';
+                echo '<a style="background: lightcoral;font-family: monospace;padding: 4px 8px;border-radius: 4px;font-size: 12px;color: white;text-decoration: none;" href="' . $backtrace[0]['file'] . '">Open in Editor (' . $editor . ')</a>';
                 echo <<<END
                 <button onclick="var compacted = document.querySelectorAll('.sf-dump-compact');for (var i = 0; i < compacted.length; i++) {compacted[i].className = 'sf-dump-expanded';};var compacted = document.querySelectorAll('.sf-dump-str-toggle');for (var i = 0; i < compacted.length; i++) {compacted[i].click();}" style='margin-left:8px;border:none;background: darkgray;font-family: monospace;padding: 4px 8px;cursor:pointer;border-radius: 4px;font-size: 12px;color: white;text-decoration: none;'>Expand All</button>
                 END;
@@ -270,12 +270,12 @@ if (! function_exists('__pr')) {
 
         if (isset($backtrace[0])) {
             // if the using Homestead
-            $backtrace[0]['file'] = $editor.'://file/'.str_replace(env('IGNITION_REMOTE_SITES_PATH', '/home/vagrant/code'), env('IGNITION_LOCAL_SITES_PATH', '/Volumes/DATA-HD/__HTDOCS'), $backtrace[0]['file']).':'.$backtrace[0]['line'];
-            $args['debug_backtrace'] = $backtrace[0]['file'].'#';
+            $backtrace[0]['file'] = $editor . '://file/' . str_replace(env('IGNITION_REMOTE_SITES_PATH', '/home/vagrant/code'), env('IGNITION_LOCAL_SITES_PATH', '/Volumes/DATA-HD/__HTDOCS'), $backtrace[0]['file']) . ':' . $backtrace[0]['line'];
+            $args['debug_backtrace'] = $backtrace[0]['file'] . '#';
         }
 
         if (Request::ajax() === false) {
-            echo '<a style="background: lightcoral;font-family: monospace;padding: 4px 8px;border-radius: 4px;font-size: 12px;color: white;text-decoration: none;" href="'.$backtrace[0]['file'].'">Open in Editor ('.$editor.')</a>';
+            echo '<a style="background: lightcoral;font-family: monospace;padding: 4px 8px;border-radius: 4px;font-size: 12px;color: white;text-decoration: none;" href="' . $backtrace[0]['file'] . '">Open in Editor (' . $editor . ')</a>';
             echo <<<END
             <button onclick="var compacted = document.querySelectorAll('.sf-dump-compact');for (var i = 0; i < compacted.length; i++) {compacted[i].className = 'sf-dump-expanded';};var compacted = document.querySelectorAll('.sf-dump-str-toggle');for (var i = 0; i < compacted.length; i++) {compacted[i].click();}" style='margin-left:8px;border:none;background: darkgray;font-family: monospace;padding: 4px 8px;cursor:pointer;border-radius: 4px;font-size: 12px;color: white;text-decoration: none;'>Expand All</button>
             END;
@@ -294,7 +294,7 @@ if (! function_exists('__pr')) {
         }
 
         return config([
-            'app.__pr.'.count(config('app.__pr', [])) => array_map(function ($argument) {
+            'app.__pr.' . count(config('app.__pr', [])) => array_map(function ($argument) {
                 return print_r($argument, true);
             }, $args),
         ]);
@@ -326,7 +326,7 @@ if (! function_exists('__logDebug')) {
 
         $backtrace = debug_backtrace();
         if (isset($backtrace[0])) {
-            $args['debug_backtrace'] = ' logged @ file --------------->  '.$backtrace[0]['file'] = str_replace(env('IGNITION_REMOTE_SITES_PATH', '/home/vagrant/code'), env('IGNITION_LOCAL_SITES_PATH', '/Volumes/DATA-HD/__HTDOCS'), $backtrace[0]['file']).':'.$backtrace[0]['line'];
+            $args['debug_backtrace'] = ' logged @ file --------------->  ' . $backtrace[0]['file'] = str_replace(env('IGNITION_REMOTE_SITES_PATH', '/home/vagrant/code'), env('IGNITION_LOCAL_SITES_PATH', '/Volumes/DATA-HD/__HTDOCS'), $backtrace[0]['file']) . ':' . $backtrace[0]['line'];
         }
 
         return array_map(function ($argument) {
@@ -366,11 +366,11 @@ if (! function_exists('__clog')) {
             $editor = config('ignition.editor', 'vscode');
             // if the using Homestead
             $backtrace[0]['file'] = str_replace(env('IGNITION_REMOTE_SITES_PATH', '/home/vagrant/code'), env('IGNITION_LOCAL_SITES_PATH', '/Volumes/DATA-HD/__HTDOCS'), $backtrace[0]['file']);
-            $args['debug_backtrace'] = $editor.'://file/'.$backtrace[0]['file'].':'.$backtrace[0]['line'].'#';
+            $args['debug_backtrace'] = $editor . '://file/' . $backtrace[0]['file'] . ':' . $backtrace[0]['line'] . '#';
         }
 
         return config([
-            'app.__clog.'.count(config('app.__clog', [])) => array_map(function ($argument) {
+            'app.__clog.' . count(config('app.__clog', [])) => array_map(function ($argument) {
                 return print_r($argument, true);
             }, $args),
         ]);
@@ -400,21 +400,21 @@ if (! function_exists('__nestedKeyValues')) {
                     array_push($formattedArray, $prepend);
                 }
 
-                $formattedArray = array_merge($formattedArray, __nestedKeyValues($value, $requestedJoiner, $prepend.$joiner.$key, $allStages));
+                $formattedArray = array_merge($formattedArray, __nestedKeyValues($value, $requestedJoiner, $prepend . $joiner . $key, $allStages));
             } else {
                 // if key is not string push item in to array with required
                 if (is_string($key) === false) {
                     if (is_string($value) === true) {
-                        array_push($formattedArray, $prepend.$joiner.$value);
+                        array_push($formattedArray, $prepend . $joiner . $value);
                     } else {
                         array_push($formattedArray, $value);
                     }
                 } else {
                     // if want to have specific key
                     if (is_string($value) and substr($value, 0, 4) === 'key@') {
-                        $formattedArray[substr($value, 4)] = $prepend.$joiner.$key;
+                        $formattedArray[substr($value, 4)] = $prepend . $joiner . $key;
                     } else {
-                        $formattedArray[$prepend.$joiner.$key] = $value;
+                        $formattedArray[$prepend . $joiner . $key] = $value;
                     }
                 }
             }
@@ -559,30 +559,30 @@ if (! function_exists('__response')) {
         // __pr() to print in console
         if (config('app.debug', false) == true) {
             $prSessItemName = '__pr';
-            if (config('app.'.$prSessItemName)) {
+            if (config('app.' . $prSessItemName)) {
                 $responseData['__dd'] = true;
                 // set for response
-                $responseData[$prSessItemName] = config('app.'.$prSessItemName, []);
-                config(['app.'.$prSessItemName => []]);
+                $responseData[$prSessItemName] = config('app.' . $prSessItemName, []);
+                config(['app.' . $prSessItemName => []]);
             }
 
             $clogSessItemName = '__clog';
 
-            if (config('app.'.$clogSessItemName)) {
+            if (config('app.' . $clogSessItemName)) {
                 $responseData['__dd'] = true;
                 // set for response
-                $responseData[$clogSessItemName] = config('app.'.$clogSessItemName, []);
+                $responseData[$clogSessItemName] = config('app.' . $clogSessItemName, []);
                 //reset the __clog items in config
-                config(['app.'.$clogSessItemName => []]);
+                config(['app.' . $clogSessItemName => []]);
             }
 
             // email view debugging
             if (config('laraware.mail_view_debug', false) == true) {
                 $testEmailViewSessName = '__emailDebugView';
-                if (config('app.'.$testEmailViewSessName)) {
-                    $responseData[$testEmailViewSessName] = config('app.'.$testEmailViewSessName, []);
+                if (config('app.' . $testEmailViewSessName)) {
+                    $responseData[$testEmailViewSessName] = config('app.' . $testEmailViewSessName, []);
                     //reset the testEmailViewSessName items in config
-                    config(['app.'.$testEmailViewSessName => []]);
+                    config(['app.' . $testEmailViewSessName => []]);
                 }
             }
         }
@@ -660,7 +660,7 @@ if (! function_exists('__yesset')) {
             if (empty($globFiles)) {
                 // if debug mode on throw an exception
                 if ((config('app.debug', false) === true) and ! ($options['prevent_exception'])) {
-                    throw new Exception('Yesset file not found - '.$keyFile.'
+                    throw new Exception('Yesset file not found - ' . $keyFile . '
                         Check * in file name.');
                 } else {
                     // if not just create file name;
@@ -681,7 +681,7 @@ if (! function_exists('__yesset')) {
                 // generate url based on file name & path
                 // also append file hash to know the file has been changed.
                 $fileHash = sha1_file($getFileName, false);
-                $fileString = asset($getFileName).'?sign='.$fileHash;
+                $fileString = asset($getFileName) . '?sign=' . $fileHash;
             }
 
             // generate tags based on file extension
@@ -699,11 +699,11 @@ if (! function_exists('__yesset')) {
                 switch ($fileExt) {
                     // script tag generation for JS file
                     case $jsItemTOMatch:
-                        $filesString .= '<script type="text/javascript" src="'.$fileString.'"></script>'.PHP_EOL;
+                        $filesString .= '<script type="text/javascript" src="' . $fileString . '"></script>' . PHP_EOL;
                         break;
-                        // link tag generation for CSS file
+                    // link tag generation for CSS file
                     case 'css':
-                        $filesString .= '<link rel="stylesheet" type="text/css" href="'.$fileString.'"/>'.PHP_EOL;
+                        $filesString .= '<link rel="stylesheet" type="text/css" href="' . $fileString . '"/>' . PHP_EOL;
                         break;
 
                     default:
@@ -1027,7 +1027,7 @@ if (! function_exists('updateCreateArrayFileItem')) {
      *-------------------------------------------------------- */
     function updateCreateArrayFileItem($configFile, $itemName, $itemValue, $options = [])
     {
-        $actualFileName = $configFile.'.php';
+        $actualFileName = $configFile . '.php';
         if (! file_exists($actualFileName)) {
             $fh = fopen($actualFileName, 'a');
             fwrite($fh, '<?php
@@ -1042,9 +1042,9 @@ if (! function_exists('updateCreateArrayFileItem')) {
         $configFileArray = require $actualFileName;
         $updatedArray = array_set($configFileArray, $itemName, $itemValue);
         $arrayString = '<?php
-            '.$options['prepend_comment'].'
+            ' . $options['prepend_comment'] . '
     return ';
-        $arrayString .= var_export($configFileArray, true).';';
+        $arrayString .= var_export($configFileArray, true) . ';';
 
         /*  config([
                 $configFile => $configFileArray
@@ -1161,23 +1161,19 @@ if (! function_exists('updateClientModels')) {
      */
     function updateClientModels(array $items, ?string $processType = null)
     {
-        // only on ajax request
-        if (Request::ajax() === true) {
-            $existingEntries = config('__update_client_models', []);
-            if ($processType) {
-                foreach ($items as $itemKey => $itemValue) {
-                    if (!isset($existingEntries["@{$itemKey}"]) and !starts_with($itemKey, ['@'])) {
-                        $items["@{$itemKey}"] = $processType;
-                    }
+        $existingEntries = config('__update_client_models', []);
+        if ($processType) {
+            foreach ($items as $itemKey => $itemValue) {
+                if (!isset($existingEntries["@{$itemKey}"]) and !starts_with($itemKey, ['@'])) {
+                    $items["@{$itemKey}"] = $processType;
                 }
-                $items["__{$processType}__"] = true;
             }
-            config([
-                '__update_client_models' => array_merge($existingEntries, $items),
-            ]);
-            unset($existingEntries);
+            $items["__{$processType}__"] = true;
         }
-
+        config([
+            '__update_client_models' => array_merge($existingEntries, $items),
+        ]);
+        unset($existingEntries);
         return true;
     }
 }
@@ -1198,14 +1194,14 @@ if (! function_exists('isExternalApiRequest')) {
 
 if (! function_exists('processExternalApiResponse')) {
     /**
-         * API Responses
-         *
-         * @param EngineResponse|array $processReaction
-         * @param array $data
-         *
-         * @since 1.17.41 - 26 MAR 2024
-         * @return \Illuminate\Http\JsonResponse
-         */
+     * API Responses
+     *
+     * @param EngineResponse|array $processReaction
+     * @param array $data
+     *
+     * @since 1.17.41 - 26 MAR 2024
+     * @return \Illuminate\Http\JsonResponse
+     */
     function processExternalApiResponse($processReaction, $data = []): \Illuminate\Http\JsonResponse
     {
         if (is_array($processReaction) === true) {
@@ -1283,6 +1279,7 @@ if (! function_exists('dispatchStreamEventData')) {
      *
      * @since 1.10.32 - 21 SEP 2023
      */
+
     function dispatchStreamEventData($eventName, $data = [])
     {
         if (request()->hasHeader('X-Event-Stream-Update')) {
@@ -1370,7 +1367,7 @@ if (! function_exists('viaFlashCache')) {
     function viaFlashCache(string $cacheKey, $originalData = null)
     {
         // fetch cached app settings from config
-        $data = config("__cached__$cacheKey", null);
+        $data = config("__flash_cached__.$cacheKey", null);
         if ($data === null) {
             if (! is_string($originalData) and is_callable($originalData)) {
                 $data = call_user_func($originalData);
@@ -1378,13 +1375,10 @@ if (! function_exists('viaFlashCache')) {
                 // if not available retrieve from original source
                 $data = $originalData;
             }
-            // check if its not running in console
-            if (! app()->runningInConsole()) {
-                // store cache in config as in memory
-                config([
-                    "__cached__$cacheKey" => $data,
-                ]);
-            }
+            // store cache in config as in memory
+            config([
+                "__flash_cached__.$cacheKey" => $data,
+            ]);
         }
 
         return $data;
@@ -1400,15 +1394,16 @@ if (! function_exists('viaFlashCache')) {
  * @since  1.14.36 - 05 JAN 2024
  *---------------------------------------------------------------- */
 if (! function_exists('emptyFlashCache')) {
-    function emptyFlashCache(string $cacheKey)
+    function emptyFlashCache(string $cacheKey = '')
     {
+        $cacheKey = $cacheKey ?  "__flash_cached__.$cacheKey" : '__flash_cached__';
         // check if its not running in console
-        if (! app()->runningInConsole()) {
-            // store cache in config as in memory
-            config([
-                "__cached__$cacheKey" => null,
-            ]);
-        }
+        // if (! app()->runningInConsole()) {
+        // store cache in config as in memory
+        config([
+            $cacheKey => null,
+        ]);
+        // }
 
         return true;
     }

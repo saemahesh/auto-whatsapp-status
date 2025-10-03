@@ -19,18 +19,18 @@ $currentAppTheme=getUserAppTheme();
                 @if( $currentAppTheme=='dark')
                 <!-- dark theme -->
                 <img src="{{ getAppSettings('dark_theme_logo_image_url') }}"
-                    class="navbar-brand-img lw-sidebar-logo-normal dark-theme-logo" alt="{{ getAppSettings('name') }}">
+                    class="navbar-brand-img lw-sidebar-logo-normal dark-theme-logo text-dark" alt="{{ getAppSettings('name') }}">
                 <img src="{{ getAppSettings('dark_theme_small_logo_image_url') }}"
-                    class="navbar-brand-img lw-sidebar-logo-small dark-theme-small-logo"
+                    class="navbar-brand-img lw-sidebar-logo-small dark-theme-small-logo text-dark"
                     alt="{{ getAppSettings('name') }}">
                 <!-- /dark theme -->
                 @elseif($currentAppTheme=='system_default')
                 <!-- dark theme -->
                 <img src="{{ getAppSettings('dark_theme_logo_image_url') }}"
-                    class="navbar-brand-img lw-sidebar-logo-normal dark-theme-logo system-theme-dark-logo"
+                    class="navbar-brand-img lw-sidebar-logo-normal dark-theme-logo system-theme-dark-logo text-dark"
                     alt="{{ getAppSettings('name') }}" media="(prefers-color-scheme: dark)">
                 <img src="{{ getAppSettings('dark_theme_small_logo_image_url') }}"
-                    class="navbar-brand-img lw-sidebar-logo-small dark-theme-small-logo system-theme-dark-small-logo"
+                    class="navbar-brand-img lw-sidebar-logo-small dark-theme-small-logo system-theme-dark-small-logo text-dark"
                     alt="{{ getAppSettings('name') }}">
                 <!-- /dark theme -->
                 <!-- light theme -->
@@ -38,7 +38,7 @@ $currentAppTheme=getUserAppTheme();
                     class="navbar-brand-img lw-sidebar-logo-normal light-theme-logo system-theme-light-logo"
                     alt="{{ getAppSettings('name') }}">
                 <img src="{{ getAppSettings('small_logo_image_url') }}"
-                    class="navbar-brand-img lw-sidebar-logo-small light-theme-small-logo system-theme-light-small-logo"
+                    class="navbar-brand-img lw-sidebar-logo-small light-theme-small-logo system-theme-light-small-logo text-dark"
                     alt="{{ getAppSettings('name') }}">
 
                 @else
@@ -46,7 +46,7 @@ $currentAppTheme=getUserAppTheme();
                 <img src="{{ getAppSettings('logo_image_url') }}"
                     class="navbar-brand-img lw-sidebar-logo-normal light-theme-logo" alt="{{ getAppSettings('name') }}">
                 <img src="{{ getAppSettings('small_logo_image_url') }}"
-                    class="navbar-brand-img lw-sidebar-logo-small light-theme-small-logo"
+                    class="navbar-brand-img lw-sidebar-logo-small light-theme-small-logo text-dark"
                     alt="{{ getAppSettings('name') }}">
                 <!-- /light theme -->
 

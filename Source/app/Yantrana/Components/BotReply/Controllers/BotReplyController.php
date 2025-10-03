@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * BotReplyController.php - Controller file
 *
 * This file is part of the BotReply component.
@@ -14,6 +32,7 @@ use App\Yantrana\Base\BaseController;
 use Illuminate\Database\Query\Builder;
 use App\Yantrana\Support\CommonPostRequest;
 use App\Yantrana\Components\BotReply\BotReplyEngine;
+use App\Yantrana\Components\WhatsAppService\WhatsAppTemplateEngine;
 
 class BotReplyController extends BaseController
 {
@@ -23,15 +42,24 @@ class BotReplyController extends BaseController
     protected $botReplyEngine;
 
     /**
+     * @var  WhatsAppTemplateEngine $whatsAppTemplateEngine - WhatsAppTemplate Engine
+     */
+    protected $whatsAppTemplateEngine;
+
+    /**
       * Constructor
       *
       * @param  BotReplyEngine $botReplyEngine - BotReply Engine
       *
       * @return  void
       *-----------------------------------------------------------------------*/
-    public function __construct(BotReplyEngine $botReplyEngine)
+    public function __construct(
+        BotReplyEngine $botReplyEngine,
+        WhatsAppTemplateEngine $whatsAppTemplateEngine
+    )
     {
         $this->botReplyEngine = $botReplyEngine;
+        $this->whatsAppTemplateEngine = $whatsAppTemplateEngine;
     }
 
 
@@ -46,7 +74,8 @@ class BotReplyController extends BaseController
         validateVendorAccess('manage_bot_replies');
         // load the view
         return $this->loadView('bot-reply.list', [
-            'dynamicFields' => $this->botReplyEngine->preDataForBots()->data('dynamicFields')
+            'dynamicFields' => $this->botReplyEngine->preDataForBots()->data('dynamicFields'),
+            'templateData' => $this->whatsAppTemplateEngine->prepareApprovedTemplates()->data()
         ]);
     }
     /**
@@ -251,6 +280,9 @@ class BotReplyController extends BaseController
                 $validations['header_text'] = "required";
             }
         }
+        if($request->message_type == 'template') {
+            $validations['template_uid'] = 'required';
+        }
         // process the validation based on the provided rules
         $request->validate($validations, [
             'uploaded_media_file_name' => __tr('Media is required')
@@ -384,11 +416,84 @@ class BotReplyController extends BaseController
                 $validations['header_text'] = "required";
             }
         }
+
+        if($request->message_type == 'template') {
+            $validations['template_uid'] = 'required';
+        }
+
         // process the validation based on the provided rules
         $request->validate($validations);
+        
         // ask engine to process the request
         $processReaction = $this->botReplyEngine->processBotReplyUpdate($request->get('botReplyIdOrUid'), $request);
         // get back with response
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
+    /**
+        * Get all active bots
+        *
+        * @return  json object
+        *---------------------------------------------------------------- */
+
+    public function getAllActiveBots($contactIdOrUid)
+    {
+        validateVendorAccess([
+            'messaging', 
+            'assigned_chats_only'
+        ]);
+        // ask engine to process the request
+        $processReaction = $this->botReplyEngine->prepareAllActiveBots($contactIdOrUid);
+        // get back to controller with engine response
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
+    /**
+        * Get bot preview
+        *
+        * @return  json object
+        *---------------------------------------------------------------- */
+
+    public function getBotPreview($botIdOrUid, $contactIdOrUid)
+    {
+        validateVendorAccess([
+            'messaging', 
+            'assigned_chats_only'
+        ]);
+        // ask engine to process the request
+        $processReaction = $this->botReplyEngine->prepareBotPreview($botIdOrUid, $contactIdOrUid);
+        // get back to controller with engine response
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
+    /**
+        * BotReply process quick reply
+        *
+        * @param  mix $botReplyIdOrUid
+        *
+        * @return  json object
+        *---------------------------------------------------------------- */
+
+    public function processBotQuickReply(BaseRequest $request)
+    {
+        validateVendorAccess([
+            'messaging', 
+            'assigned_chats_only'
+        ]);
+        if(isDemo() and isDemoVendorAccount()) {
+            return $this->processResponse(22, [
+                22 => __tr('Functionality is disabled in this demo.')
+            ], [], true);
+        }
+
+        $request->validate([
+            'bot_id' => 'required',
+            'contact_id_or_uid' => 'required'
+        ]);
+
+        // ask engine to process the request
+        $processReaction = $this->botReplyEngine->processSendTestBotReply($request->bot_id, $request->contact_id_or_uid);
+        // get back to controller with engine response
         return $this->processResponse($processReaction, [], [], true);
     }
 }

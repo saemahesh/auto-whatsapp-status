@@ -95,9 +95,9 @@
                                 <div>
                                     <label class="small"><?= __tr('Status') ?>:</label>
                                     <% if(__tData.status == 1) { %>
-                                        <div class="lw-details-item">Active</div>
+                                        <div class="lw-details-item"><?= __tr('Active') ?></div>
                                         <% } else { %>
-                                            <div class="lw-details-item">Inactive</div>
+                                            <div class="lw-details-item"><?= __tr('Inactive') ?></div>
                                             <% } %>
                                 </div>
                              </script>
@@ -136,8 +136,8 @@
                             <!-- /Description -->
                              <!-- Show in menu -->
                              <div class="form-group">
-                                <input type="checkbox" name="show_in_menu" class="lw-form-field js-switch" ui-switch="" id="lwshowinMenuField" data-lw-plugin="lwSwitchery" <%- __tData.show_in_menu == 1 ? 'checked' : '' %>>
-                                <label for="lwshowinMenuField"><?= __tr('Show in menu') ?></label>
+                                <input type="checkbox" name="show_in_menu" class="lw-form-field js-switch" ui-switch="" id="lwshowinMenuFieldEdit" data-lw-plugin="lwSwitchery" <%- __tData.show_in_menu == 1 ? 'checked' : '' %>>
+                                <label for="lwshowinMenuFieldEdit"><?= __tr('Show in menu') ?></label>
                             </div>
                             <!-- /Show in menu -->
                             <!-- Status -->

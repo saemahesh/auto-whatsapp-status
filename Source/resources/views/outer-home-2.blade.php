@@ -127,7 +127,7 @@ $appName = getAppSettings('name');
                         <!-- heading -->
                         <div class="lw-title ubuntu-bold">
                             {{ __tr('Engage Your Customers on WhatsApp Like Never Before') }} <span
-                                class="highlight">{!! __tr(' __appName__ ', ['__appName__' => $appName]) !!}</span>
+                                class="highlight">{!! __tr('__appName__ ', ['__appName__' => $appName]) !!}</span>
                         </div>
                         <!-- heading -->
                         <!-- description -->
@@ -159,8 +159,7 @@ $appName = getAppSettings('name');
         <section class="lw-section-block-content">
             <div class="container">
                 <!-- heading -->
-                <h2 class="text-dark ubuntu-bold text-center"> {{ __tr('Why Choose') }} <span class="lw-highlight">{!!
-                        __tr(' __appName__?', ['__appName__' => $appName]) !!}</span></h2>
+                <h2 class="text-dark ubuntu-bold text-center"> {{ __tr('Why Choose') }} <span class="lw-highlight">{!! __tr('__appName__?', ['__appName__' => $appName]) !!}</span></h2>
                 <!-- /heading -->
                 <div class="row">
                     <!-- First card -->
@@ -268,7 +267,7 @@ $appName = getAppSettings('name');
                     <div class="col-sm-12 col-md-6 col-lg-4 co-xl-4 mb-4">
                         <div class="card border-0 p-5 h-100 ">
                             <i class="fas fa-cogs"></i>
-                            <h5 class="ubuntu-bold mt-3 mb-2">{{ __tr(' APIs to connect with other services') }}
+                            <h5 class="ubuntu-bold mt-3 mb-2">{{ __tr('APIs to connect with other services') }}
                             </h5>
                             <p>{{ __tr('API’s enable seamless connection between different services, allowing data sharing and functionality integration.') }}
                             </p>
@@ -289,7 +288,7 @@ $appName = getAppSettings('name');
                     <div class="col-sm-12 col-md-6 col-lg-4 co-xl-4 mb-4">
                         <div class="card border-0 p-5 h-100 ">
                             <i class="fas fa-bolt"></i>
-                            <h5 class="ubuntu-bold mt-3 mb-2">{{ __tr(' Realtime Updates') }}</h5>
+                            <h5 class="ubuntu-bold mt-3 mb-2">{{ __tr('Realtime Updates') }}</h5>
                             <p>{{ __tr('Realtime message and campaign status updates to see your campaign or message performance.') }}
                             </p>
                         </div>
@@ -441,7 +440,7 @@ $appName = getAppSettings('name');
                             {{ __tr('Scan QR Code to Start Chat') }}
                         </h6>
                         <p class="text-white">
-                            {{ __tr(' Quickly generate QR codes for your WhatsApp phone number with ease using this feature. Users can effortlessly connect by scanning the code with their smartphones, instantly initiating communication with your WhatsApp account. This streamlined process ensures smooth interactions and easy access for engaging with your audience.') }}
+                            {{ __tr('Quickly generate QR codes for your WhatsApp phone number with ease using this feature. Users can effortlessly connect by scanning the code with their smartphones, instantly initiating communication with your WhatsApp account. This streamlined process ensures smooth interactions and easy access for engaging with your audience.') }}
                         </p>
                     </div>
                 </div>
@@ -454,7 +453,7 @@ $appName = getAppSettings('name');
                             {{ __tr('AI Bots Integration for Vendors using') }}<span
                                 class="text-warning">{{ __tr('FlowiseAI') }}</span></h2>
                         <p class="text-white">
-                            {{ __tr(' Flowise AI offers AI-powered chatbots for vendors to automate customer interactions and enhance engagement.') }}
+                            {{ __tr('Flowise AI offers AI-powered chatbots for vendors to automate customer interactions and enhance engagement.') }}
                         </p>
                     </div>
                     <div class="col-sm-12 col-md-6 col-lg-6 text-center">
@@ -658,7 +657,7 @@ $appName = getAppSettings('name');
                                     <button class="accordion-button border-bottom collapsed" type="button"
                                         data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true"
                                         aria-controls="collapseOne">
-                                        {{ __tr(' How do I sign up for __appName__?', [
+                                        {{ __tr('How do I sign up for __appName__?', [
                                             '__appName__' => $appName,
                                         ]) }}
                                     </button>

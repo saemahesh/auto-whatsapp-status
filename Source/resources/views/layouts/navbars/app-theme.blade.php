@@ -14,7 +14,7 @@ $currentAppTheme = getUserAppTheme()
             @elseif($currentAppTheme === 'light')
             <i class="fas fa-sun text-yellow"></i> <!-- Icon for light theme -->
             @elseif($currentAppTheme === 'system_default')
-            <i class=" fas fa-desktop text-white"></i> <!-- Icon for default theme -->
+            <i class=" fas fa-desktop text-dark text-black"></i> <!-- Icon for default theme -->
             @else
             <i class="fas fa-palette"></i> <!-- Fallback icon for unknown themes -->
             @endif
@@ -30,10 +30,10 @@ $currentAppTheme = getUserAppTheme()
         <li class="@if($currentAppTheme === 'system_default') active @endif">
             <a class="dropdown-item lw-ajax-link-action d-flex align-items-center" data-show-processing="true"
                 href="{{ route('change.app.theme', ['themeID' => 'system_default']) }}">
-                <span class="text-dark  ">
+                <span >
                     <i class="fas fa-desktop mr-3 "></i>
                 </span>
-                <span class="text-dark"> {{ __tr('System') }}</span>
+                <span > {{ __tr('System') }}</span>
             </a>
         </li>
         <!-- /System -->

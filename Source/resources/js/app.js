@@ -79,6 +79,7 @@ window.appFuncs = {
 
 $('.modal').on('shown.bs.modal', function (shownEvent) {
     var $targetModal = $(shownEvent.target);
+    // Initialize filepond uploader if it is set to initialize
     if ($targetModal.data('init-uploader') && $targetModal.find('.lw-file-uploader').length) {
         window.initUploader();
     }
@@ -106,6 +107,15 @@ $('.modal').on('hidden.bs.modal', function (hiddenEvent) {
             if (selectizeFieldElement.selectize) {
                 selectizeFieldElement.selectize.destroy();
                 $(selectizeFieldElement).val('').change();
+            }
+        });
+        // reset switchery
+        $targetForm.find('[data-lw-plugin="lwSwitchery"]').each(function(index, $checkbox) {
+            var defaultState = $(this).data('default-state');
+            if ($checkbox.switchery) {
+                $checkbox.checked = !defaultState;
+                $checkbox.switchery.setPosition(true);
+                $checkbox.switchery.handleOnchange(true);
             }
         });
     }
@@ -138,6 +148,17 @@ window.addEventListener('DOMContentLoaded', event => {
     // scroll to bottom on chatbox message submit
     $(document).on('onChatBoxMessageSubmit', function (event, dataResponse) {
         window.lwScrollTo('#lwEndOfChats', true);
+    });
+
+    $('.modal').on('hide.bs.modal', function (e) {
+      var modal = this;
+      if (modal.classList.contains('slide-out')) return;
+      e.preventDefault();
+      modal.classList.add('slide-out');
+      setTimeout(function () {
+        $(modal).modal('hide');
+        modal.classList.remove('slide-out');
+      }, 400);
     });
 
 });

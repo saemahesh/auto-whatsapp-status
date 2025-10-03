@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * WhatsAppMessageQueueRepository.php - Repository file
 *
 * This file is part of the WhatsAppService component.
@@ -38,14 +56,15 @@ class WhatsAppMessageQueueRepository extends BaseRepository implements WhatsAppM
         ];
         $stuckItemsCount = $this->primaryModel::where($where)->count();
         if ($stuckItemsCount) {
-            // requeue stuck queue items in processing more than 10 minutes
-            $this->updateIt($where, [
-                'status' => 1, // queue
+            // stuck queue items in processing more than 5 minutes
+            $this->updateItAll($where, [
+                'status' => 6, // processed & response awaited
                 '__data' => [
                     'process_response' => [
-                        'error_status'  => 'requeued_connection_error',
-                        'error_message' => 're-processing'
+                        'error_status'  => 'awaited_response_error',
+                        'error_message' => 'Responses awaited from WhatsApp',
                     ]
+                    
                 ]
             ]);
         }
@@ -59,6 +78,21 @@ class WhatsAppMessageQueueRepository extends BaseRepository implements WhatsAppM
      */
     public function getQueueItemsForProcess()
     {
+        $this->updateItAll([
+            'status' => 1,
+            [
+                '__data->expiry_at', '<=', now()
+            ]
+        ], [
+            'status' => 5, // Expired
+            '__data' => [
+                'process_response' => [
+                    'error_message' => 'message expired',
+                    'error_status' => 'campaign_expired_error',
+                ]
+            ]
+        ]);
+
         // go grab queue records for processing
         return $this->primaryModel::select([
             '_id',
@@ -71,7 +105,7 @@ class WhatsAppMessageQueueRepository extends BaseRepository implements WhatsAppM
                 // time has passed on
                 'scheduled_at', '<=', now()
             ],
-        ])->oldest()->take((getAppSettings('cron_process_messages_per_lot') ?: 35))->get();
+        ])->oldest()->take((getAppSettings('cron_process_messages_per_lot') ?: 60))->get();
     }
     /**
      * Queued messages count

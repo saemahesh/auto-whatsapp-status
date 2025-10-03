@@ -1,4 +1,22 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
  * SubscriptionEngine.php - Main component file
@@ -285,7 +303,7 @@ class SubscriptionEngine extends BaseEngine implements SubscriptionEngineInterfa
     {
         return $this->subscriber()->downloadInvoice($invoiceId, [
             'vendor' => getVendorSettings('name'),
-            'product' => getVendorSettings('name').__tr(' Subscription'),
+            'product' => getVendorSettings('name').__tr('Subscription'),
         ]);
     }
 
@@ -382,7 +400,7 @@ class SubscriptionEngine extends BaseEngine implements SubscriptionEngineInterfa
             },
             'stripe_id' => function ($keyItem) {
                 if (__isEmpty($keyItem['stripe_id'])) {
-                    return 'NA';
+                    return __tr('NA');
                 }
 
                 return $keyItem['stripe_id'];
@@ -394,14 +412,14 @@ class SubscriptionEngine extends BaseEngine implements SubscriptionEngineInterfa
             // 'trial_ends_at',
             'ends_at' => function ($keyItem) {
                 if (! ($keyItem['ends_at'])) {
-                    return 'NA';
+                    return __tr('NA');
                 } else {
                     return formatDate($keyItem['ends_at']);
                 }
             },
             'created_at' => function ($keyItem) {
                 if (__isEmpty($keyItem['created_at'])) {
-                    return 'NA';
+                    return __tr('NA');
                 }
 
                 return formatDate($keyItem['created_at']);

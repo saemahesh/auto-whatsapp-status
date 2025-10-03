@@ -8,7 +8,7 @@
 @push('head')
 {!! __yesset('dist/css/whatsapp-chat.css', true) !!}
 @endpush
-<div x-data="initialMessageData">
+<div x-data="initialMessageData"> 
 {{-- @if ($contact) --}}
 <div class="container-fluid" x-data="{myAssignedUnreadMessagesCount:null,myUnassignedUnreadMessagesCount:null,showUnreadContactsOnly:false,usersUnreadMessagesCounts:{}}">
     <div class="">
@@ -45,12 +45,26 @@
                               <a href="{{ route('vendor.chat_message.contact.view', [
                                 'assigned' => 'unassigned',
                               ]) }}" class="nav-link {{ ($assigned ?? null) == 'unassigned' ? 'active' : '' }}" id="lw-unassigned-tab"  data-target="#lwUnassignedTab" type="button" role="tab" aria-controls="lwUnassignedTab" aria-selected="false">{{  __tr('Unassigned') }} <span x-cloak x-show="myUnassignedUnreadMessagesCount" class="badge bg-yellow text-dark badge-white rounded-pill ml-1" x-text="myUnassignedUnreadMessagesCount"></span></a>
-                             @if(!__isEmpty($vendorMessagingUsers))
+                             @if(!__isEmpty($vendorMessagingUsers) and ($vendorMessagingUsers->count() > 1))
+                             @foreach ($vendorMessagingUsers as $vendorMessagingUser)
+                                @if($vendorMessagingUser->_uid != getUserUID())
+                                @if ((($assigned ?? null) == $vendorMessagingUser->_id) or ($vendorMessagingUsers->count() == 2))
+                                    <a href="{{ route('vendor.chat_message.contact.view', [
+                                'assigned' => $vendorMessagingUser->_id,
+                              ]) }}" class="nav-link {{ ($assigned ?? null) == $vendorMessagingUser->_id ? 'active' : '' }}"> {{ $vendorMessagingUser->first_name . ' ' . $vendorMessagingUser->last_name }} <span x-cloak x-show="usersUnreadMessagesCounts['{{ $vendorMessagingUser->_uid }}']" class="badge bg-yellow text-dark badge-white rounded-pill ml-1" x-text="usersUnreadMessagesCounts['{{ $vendorMessagingUser->_uid }}']"></span></a>
+                              @break
+                                @endif
+                              @endif
+                                @endforeach
+                                @if ($vendorMessagingUsers->count() > 2)
                               <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-expanded="false">{{  __tr('Others') }}</a>
                                 <div class="dropdown-menu dropdown-menu-right">
                                   @foreach ($vendorMessagingUsers as $vendorMessagingUser)
                                 @if($vendorMessagingUser->_uid != getUserUID())
+                                 @if (($assigned ?? null) == $vendorMessagingUser->_id)
+                                    @continue
+                                 @endif
                                 <a href="{{ route('vendor.chat_message.contact.view', [
                                 'assigned' => $vendorMessagingUser->_id,
                               ]) }}" class="dropdown-item {{ ($assigned ?? null) == $vendorMessagingUser->_id ? 'active' : '' }}" id="lw-unassigned-tab"  data-target="#lwUnassignedTab" type="button" role="tab" aria-controls="lwUnassignedTab" aria-selected="false"> {{ $vendorMessagingUser->first_name . ' ' . $vendorMessagingUser->last_name }} <span x-cloak x-show="usersUnreadMessagesCounts['{{ $vendorMessagingUser->_uid }}']" class="badge bg-yellow text-dark badge-white rounded-pill ml-1" x-text="usersUnreadMessagesCounts['{{ $vendorMessagingUser->_uid }}']"></span></a>
@@ -58,6 +72,7 @@
                                 @endforeach
                                 </div>
                               </li>
+                              @endif
                               @endif
                                @endif
                             </div>
@@ -105,11 +120,11 @@
                                 <a x-show="(contact && contact._uid == contactItem._uid) || (showUnreadContactsOnly && contactItem.unread_messages_count) || !showUnreadContactsOnly" @click.prevent="isContactListOpened = false;contact = {};whatsappMessageLogs=[]" :data-messaged-at="contactItem.last_message?.messaged_at" @click="whatsappMessageLogs = [];messagePaginatePage = 0;contact.__data = {}; appFuncs.resetForm();"
                                     :class="[(contact && (contact._uid == contactItem._uid)) ? 'lw-contact-list-item-selected' : '']"
                                     :href="__Utils.apiURL('{{ route('vendor.chat_message.contact.view', ['contactUid', 'assigned' => ($assigned ?? '')]) }}',{'contactUid': contactItem._uid})"
-                                    class="list-group-item list-group-item-action lw-contact lw-ajax-link-action" data-callback="updateContactInfo">
+                                    class="list-group-item list-group-item-action lw-contact lw-ajax-link-action lw-action-change-url" data-callback="updateContactInfo">
                                     {{-- d-flex align-items-start --}}
                                     <div class="ms-2 me-auto w-100 mt-1">
                                         <div class="float-left">
-                                                <div class="lw-contact-avatar bg-success text-white text-center align-content-center">
+                                                <div class="lw-contact-avatar bg-primary text-white text-center align-content-center">
                                                     <span x-text="contactItem.name_initials"></span>
                                                 </div>
                                         </div>
@@ -118,22 +133,23 @@
                                                 <span x-show="contactItem.full_name" x-text="contactItem.full_name"></span>
                                                 <span x-show="contactItem.full_name"> - </span>
                                                 <span x-text="contactItem.wa_id"></span>
-                                                <span class="mb--2 float-right" x-init="contactItem.label_string = ''; contactLabel = {}">
-                                                    <template x-for="contactLabel in contactItem.labels">
-                                                        <span class="mr--2" x-init="contactItem.label_string = contactItem.label_string + ' ' + contactLabel.title" class="" x-bind:title="contactLabel.title"><i x-bind:style="'color:'+contactLabel.bg_color+';'" class="fa fa-tag"></i></span>
-                                                    </template>
-                                                </span>
                                             </h3>
                                         </div>
                                     </div>
-                                    <div class="mt-2 text-right w-100 mt-3">
-                                        <small class="text-dark lw-last-message-at"
+                                    <div class="mt-0 p-2" x-init="contactItem.label_string = ''; contactLabel = {}">
+                                    <template x-for="contactLabel in contactItem.labels">
+                                        <span class="mr-2"><small  x-init="contactItem.label_string = contactItem.label_string + ' ' + contactLabel.title" class="mr-0" x-bind:title="contactLabel.title"><i x-bind:style="'color:'+contactLabel.bg_color+';'" class="fa fa-tag"></i></small> <small x-text="contactLabel.title"></small></span>
+                                    </template>
+                                </div>
+                                <hr class="my-0">
+                                <div class="text-right w-100 mb-2 px-2 small">
+                                        <small class="text-muted lw-last-message-at small"
                                             x-text="contactItem.last_message?.formatted_message_ago_time"></small>
                                         <span x-show="contactItem.unread_messages_count"
                                             class="badge bg-success rounded-pill"
                                             x-text="contactItem.unread_messages_count"></span>
                                     </div>
-                                </a>
+                                    </a>
                                 @if (($assigned ?? null))
                                 {{-- </template> --}}
                                 @endif
@@ -158,7 +174,7 @@
                                                     <div class="back d-md-none" @click.prevent="isContactListOpened = true">
                                                         <i class="fa fa-users"></i>
                                                     </div>
-                                                    <div class="avatar d-none d-md-inline bg-success text-white text-center align-content-center">
+                                                    <div class="avatar d-none d-md-inline bg-primary text-white text-center align-content-center">
                                                         <span x-text="contact.name_initials"></span>
                                                     </div>
                                                     <div class="name">
@@ -170,13 +186,9 @@
                                                             <span class="status text-yellow " title="{{ __tr("As you may not received any response in last 24 hours, your direct message may not get delivered. However you can send template messages.") }}">{{  __tr('You can\'t reply, they needs to reply back to start conversion.') }}</span>
                                                              </template>
                                                     </div>
+                                                    
                                                     <template x-if="contact">
                                                     <div class="actions more lw-user-new-actions" x-data="{isAiChatBotEnabled:!contact.disable_ai_bot}" x-cloak>
-                                                        @if(isAiBotAvailable())
-                                                        <a :title="isAiChatBotEnabled ? '{{ __tr('Enable AI Bot') }}' : '{{ __tr('Disable AI Bot') }}'" x-bind:href="__Utils.apiURL('{{ route('vendor.contact.write.toggle_ai_bot', [ 'contactIdOrUid']) }}', {'contactIdOrUid': contact._uid})" :class="isAiChatBotEnabled ? 'text-yellow' : 'text-white'" class="lw-whatsapp-bar-icon-btn mr-3 lw-ajax-link-action" data-method="post">
-                                                           <i class="fa fa-robot"></i>
-                                                        </a>
-                                                        @endif
                                                         <a href="#" class="lw-whatsapp-bar-icon-btn" data-toggle="dropdown" aria-expanded="false">
                                                             <i class="fas fa-ellipsis-v text-white"></i>
                                                         </a>
@@ -190,6 +202,36 @@
                                                             <h3>{{  __tr('Are you sure you want to clear chat history for this contact?') }}</h3>
                                                                 <p class="text-warning">{{  __tr('Only chat history will be deleted permanently, it won\'t delete campaign messages.') }}</p>
                                                             </script>
+
+                                                            <template x-if='contact && (_.isEmpty(contact?.wa_blocked_at))'>
+                                                                <span :title="isDirectMessageDeliveryWindowOpened == false ? '{{ __tr('Blocking is not allowed as no response has been received within the past 24 hours') }}' : ''">
+                                                                <a x-cloak
+                                                                    :class="{ 'disabled': isDirectMessageDeliveryWindowOpened == false }"
+                                                                    :style="isDirectMessageDeliveryWindowOpened == false ? {
+                                                                        'pointer-events': 'none',
+                                                                        'color': 'gray',
+                                                                        'cursor': 'not-allowed',
+                                                                        'text-decoration': 'none'
+                                                                        } : {}"
+                                                                    :href="isDirectMessageDeliveryWindowOpened == false ? 'javascript:void(0)' : __Utils.apiURL('{{ route('vendor.contact.write.block', ['contactIdOrUid']) }}', { contactIdOrUid: contact._uid })"
+                                                                    @click="if (isDirectMessageDeliveryWindowOpened == false) { $event.preventDefault(); console.log('blocked'); return; }"
+                                                                    data-method="post"
+                                                                    data-confirm="#lwBlockContact-template"
+                                                                    title="{{ __tr('Block') }}"
+                                                                    data-callback="appFuncs.modelSuccessCallback"
+                                                                    class="dropdown-item lw-ajax-link-action-via-confirm"
+                                                                    aria-disabled="true">
+                                                                    <i class="fa fa-ban"></i> {{ __tr('Block') }}
+                                                                </a>
+                                                                </span>
+                                                            </template>
+
+                                                            <template x-if='contact && (!_.isEmpty(contact?.wa_blocked_at))'>
+                                                                <a x-cloak 
+                                                                :href="__Utils.apiURL('{{ route('vendor.contact.write.unblock', [ 'contactIdOrUid']) }}', {'contactIdOrUid': contact._uid})"
+                                                                @click="if (isDirectMessageDeliveryWindowOpened == false) { $event.preventDefault(); console.log('blocked'); return; }"
+                                                                data-method="post" class="dropdown-item lw-ajax-link-action-via-confirm" data-confirm="#lwUnblockContact-template" title="{{ __tr('Unblock') }}" data-callback="appFuncs.modelSuccessCallback" aria-disabled="true"><i class="fa fa-ban"></i> {{ __tr('Unblock') }}</a>
+                                                            </template>
                                                         </div>
                                                         <span class="lw-whatsapp-bar-icon-btn ml-3 d-md-none" @click.prevent="isContactCrmBlockOpened = true"><i class="fa fa-user-tie"></i></span>
                                                     </div>
@@ -203,7 +245,7 @@
                                                                 <div class="lw-chat-message-item"
                                                                     :id="whatsappMessageLogItem._uid">
                                                                     <template
-                                                                        x-if="whatsappMessageLogItem.is_incoming_message">
+                                                                        x-if="whatsappMessageLogItem.is_incoming_message && !whatsappMessageLogItem.is_system_message">
                                                                         <div class="message received">
                                                                             <template
                                                                                 x-if="whatsappMessageLogItem.replied_to_whatsapp_message_logs__uid">
@@ -235,7 +277,7 @@
                                                                         </div>
                                                                     </template>
                                                                     <template
-                                                                        x-if="!whatsappMessageLogItem.is_incoming_message">
+                                                                        x-if="!whatsappMessageLogItem.is_incoming_message && !whatsappMessageLogItem.is_system_message">
                                                                         <div class="message sent">
                                                                             <template
                                                                                 x-if="whatsappMessageLogItem.__data?.options?.bot_reply">
@@ -279,57 +321,59 @@
                                                                                 <span class="tick">
                                                                                     <template
                                                                                         x-if="whatsappMessageLogItem.status == 'read'">
-                                                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                                                            width="16" height="15"
-                                                                                            id="msg-dblcheck-ack" x="2063"
-                                                                                            y="2076">
-                                                                                            <path
-                                                                                                d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"
-                                                                                                fill="#4fc3f7" />
-                                                                                        </svg>
+                                                                                        <img src="{{ __yesset('imgs/icons/icon-read.svg') }}" title="{{ __tr('Read') }}" width="16" height="16">
                                                                                     </template>
                                                                                     <template
                                                                                         x-if="whatsappMessageLogItem.status == 'delivered'">
-                                                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                                                            width="16" height="15"
-                                                                                            id="msg-dblcheck" x="2047"
-                                                                                            y="2061">
-                                                                                            <path
-                                                                                                d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"
-                                                                                                fill="#92a58c" />
-                                                                                        </svg>
+                                                                                        <img src="{{ __yesset('imgs/icons/icon-delivered.svg') }}" title="{{ __tr('Delivered') }}" width="16" height="16">
                                                                                     </template>
                                                                                     <template
                                                                                         x-if="whatsappMessageLogItem.status == 'sent'">
-                                                                                        <svg width="16" height="16"
-                                                                                            viewBox="0 0 24 24" fill="none"
-                                                                                            xmlns="http://www.w3.org/2000/svg">
-                                                                                            <path
-                                                                                                d="M4 12.6111L8.92308 17.5L20 6.5"
-                                                                                                stroke="#92a58c"
-                                                                                                stroke-width="2"
-                                                                                                stroke-linecap="round"
-                                                                                                stroke-linejoin="round" />
-                                                                                        </svg>
+                                                                                        <img src="{{ __yesset('imgs/icons/icon-sent.svg') }}" title="{{ __tr('Sent') }}" width="16" height="16">
                                                                                     </template>
                                                                                     <template
                                                                                         x-if="whatsappMessageLogItem.status == 'failed'">
-                                                                                        <i
+                                                                                        <i title="{{ __tr('Failed') }}"
                                                                                             class="fas fa-exclamation-circle text-danger"></i>
                                                                                     </template>
                                                                                     <template
                                                                                         x-if="(whatsappMessageLogItem.status == 'accepted')">
-                                                                                        <i
+                                                                                        <i title="{{ __tr('Accepted') }}"
                                                                                             class="far fa-clock text-muted"></i>
                                                                                     </template>
                                                                                 </span>
                                                                             </span>
                                                                         </div>
                                                                     </template>
+                                                                    <template x-if="whatsappMessageLogItem.is_system_message">
+                                                                        <div>
+                                                                            <div class="text-center align-content-center lw-system-message-container">
+                                                                                <span class="badge rounded-pill text-bg-secondary text-capitalize" x-text="whatsappMessageLogItem.formatted_updated_time"></span>
+                                                                            </div>
+                                                                            
+                                                                            <div class="alert text-center align-content-center lw-chat-history-container">
+                                                                                <div class="lw-chat-history-message" x-text="whatsappMessageLogItem.message"></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </template>
                                                                 </div>
                                                             </template>
                                                             <div class="w-100 px-4" id="lwEndOfChats">&shy; <button x-cloak x-show="messagePaginatePage" class="btn btn-sm btn-block btn-secondary" @click="loadEarlierMessages" ><i class="fa fa-download"></i> {{  __tr('Load earlier messages') }}</button></div>
                                                     </div>
+                                                    
+                                                    <template x-if="contact && (!_.isEmpty(contact?.wa_blocked_at))">                                            
+                                                        <div class="alert alert-light text-center align-content-center">
+                                                            <strong class="text-danger" title="{{ __tr('Unblock') }}">{{  __tr('This contact is blocked, ') }}
+                                                                <a data-method="post" 
+                                                                class="lw-ajax-link-action-via-confirm"
+                                                                :href="__Utils.apiURL('{{ route('vendor.contact.write.unblock', [ 'contactIdOrUid']) }}', {'contactIdOrUid': contact._uid})"
+                                                                @click="if (isDirectMessageDeliveryWindowOpened == false) { $event.preventDefault(); console.log('blocked'); return; }"
+                                                                data-confirm="#lwUnblockContact-template" title="{{ __tr('Click here to unblock.') }}" data-callback-params="{{ json_encode(['datatableId' => '#lwContactList']) }}" data-callback="appFuncs.modelSuccessCallback"><i class="fa fa-ban"></i> {{  __tr('Click here to unblock.') }}</a></strong>                                   
+                                                        </div>
+                                                    </template>
+
+                                                    <span x-show="contact && (_.isEmpty(contact?.wa_blocked_at))">
+                                                    
                                                     <x-lw.form data-event-stream-update="true" data-callback="appFuncs.resetForm" id="whatsAppMessengerForm"
                                                         class="conversation-compose" data-show-processing="false"
                                                         :action="route('vendor.chat_message.send.process')">
@@ -338,13 +382,20 @@
                                                         --}}
                                                         <div class="emoji">
                                                         </div>
-                                                        <textarea name="message_body" required class="input-msg lw-input-emoji" placeholder="{{ __tr(' Type a message') }}" autocomplete="off" autofocus></textarea>
+                                                        <textarea name="message_body" required class="input-msg lw-input-emoji" placeholder="{{ __tr('Type a message') }}" autocomplete="off" autofocus></textarea>
                                                             <div class="photo dropup">
                                                                 <!-- Default dropup button -->
                                                                 <a href="#" class="lw-whatsapp-bar-icon-btn" data-toggle="dropdown" aria-expanded="false">
                                                                     <i class=" fa fa-paperclip text-muted"></i>
                                                                 </a>
                                                                 <div class="dropdown-menu dropdown-menu-right">
+
+                                                                <!-- Quick Bot Reply -->
+                                                                <a title="{{ __tr('Quick Bot Reply') }}"
+                                                                    class="lw-ajax-link-action dropdown-item" data-response-template="#lwQuickReplyContentBody" x-bind:href="__Utils.apiURL('{{ route('vendor.bot_reply.read.all.active.bots', ['contactIdOrUid']) }}', { 'contactIdOrUid': contact._uid})"  data-toggle="modal" data-target="#lwQuickReply"><i class="fa fa-bolt text-muted"></i> {{ __tr('Quick Bot Reply') }}
+                                                                </a>
+                                                                <!-- /Quick Bot Reply -->
+                                                                
                                                                     <a title="{{ __tr('Send Document') }}"
                                                                 class="lw-ajax-link-action dropdown-item" data-toggle="modal"
                                                                 data-response-template="#lwWhatsappAttachment"
@@ -389,6 +440,7 @@
                                                     <div data-form-id="#whatsAppMessengerForm"
                                                         class="lw-error-container-message_body p-2">
                                                     </div>
+                                                    </span>
                                                 </div>
                                             </div>
                                         {{-- </template> --}}
@@ -423,11 +475,28 @@
                                     </fieldset>
                                 </template>
                                 <div class="col-12 p-0">
-                                    <x-lw.form id="lwAssignSystemUserForm" :action="route('vendor.chat.assign_user.process')" >
+                                    <x-lw.form id="lwAssignSystemUserForm" :action="route('vendor.chat.assign_user.process')" data-callback="window.assignTeamMember">
                                         <input type="hidden" name="contactIdOrUid" :value="contact?._uid">
                                         {{-- Select messaging permitted team member to assign this contact chat --}}
                                         <fieldset class="col-12 p-2">
                                             <legend>{{  __tr('Assign Team Member') }}</legend>
+                                            
+                                                <div class="my-3">
+                                                    @if(isAiBotAvailable())                                                        
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="checkbox" x-model="isAiChatBotEnabled" id="lwEnableAiBot" value="1">
+                                                            <label class="form-check-label" for="lwEnableAiBot">{{ __tr('Enable AI Bot') }}</label>
+                                                            <input type="hidden" name="enable_ai_bot" :value="isAiChatBotEnabled ? '1' : ''">
+                                                        </div>
+                                                    @endif
+
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="checkbox" x-model="isReplyBotEnable" id="lwEnableReplyBot" value="1">
+                                                        <label class="form-check-label" for="lwEnableReplyBot">{{ __tr('Enable Reply Bot') }}</label>
+                                                        <input type="hidden" name="enable_reply_bot" :value="isReplyBotEnable ? '1' : ''">
+                                                    </div>
+                                                </div>
+                                            
                                             <x-lw.input-field id="lwCurrentlyAssignedUserUid" type="selectize" data-form-group-class="mt--4" name="assigned_users_uid" class="custom-select"
                                     data-selected="{{ $currentlyAssignedUserUid }}" x-model="currentlyAssignedUserUid">
                                             <x-slot name="selectOptions">
@@ -449,7 +518,7 @@
                                     <fieldset class="col-12 p-2">
                                         {{-- <hr class="my-4"> --}}
                                         <legend class="pb-0 pt-1">{{  __tr('Labels/Tags') }} <a data-pre-callback="appFuncs.clearContainer" title="{{  __tr('Manage Labels') }}" class="lw-btn btn btn-sm btn-link lw-ajax-link-action float-right pt-1" data-response-template="#lwManageContactLabelsBody" x-bind:href="__Utils.apiURL('{{ route('vendor.chat.contact_labels.read', [ 'contactUid']) }}', {'contactUid': contact._uid})"  data-toggle="modal" data-target="#lwManageContactLabels"><i class="fa fa-cog"></i></a></legend>
-                                        <x-lw.form data-callback="onUpdateContactDetails" id="lwAssignContactLabelsForm" :action="route('vendor.chat.assign_labels.process')">
+                                        <x-lw.form data-callback="onUpdateLabels" id="lwAssignContactLabelsForm" :action="route('vendor.chat.assign_labels.process')">
                                                 <input type="hidden" name="contactUid" x-bind:value="contact._uid" />
                                                 <div x-show="labelsElement"></div>
                                                 <select class="border-0 lw-borderers-selectize" id="lwAssignLabelsField" data-form-group-class="" x-bind:data-selected="assignedLabelIds" name="contact_labels[]" multiple >
@@ -556,6 +625,7 @@
 </x-lw.modal>
  <!-- Edit Contact Modal -->
  @include('contact.contact-edit-modal-partial')
+ @include('whatsapp.quick-reply-modal')
  <!--/ Edit Contact Modal -->
  {{-- Manage labels Modal --}}
  <x-lw.modal id="lwManageContactLabels" :header="__tr('Manage Labels')" :hasForm="true">
@@ -621,6 +691,8 @@
             contact:@json($contact),
             isContactDetailsUpdated: false,
             currentlyAssignedUserUid:'{{ $currentlyAssignedUserUid }}',
+            isAiChatBotEnabled: "{{ $isAiChatBotEnabled }}",
+            isReplyBotEnable: "{{ $isReplyBotEnable }}",
             search: "",
             search_labels: "",
             contacts: {},
@@ -674,9 +746,25 @@
 @endpush
 @push('appScripts')
 {!! __yesset('dist/emojionearea/emojionearea.min.js', true) !!}
+
+<!-- Contact block template -->
+<script type="text/template" id="lwBlockContact-template">
+    <h2>{{ __tr('Are You Sure!') }}</h2>
+    <p>{{ __tr('You want to block this Contact?') }}</p>
+</script>
+<!-- /Contact block template -->
+
+ <!-- Contact unblock template -->
+<script type="text/template" id="lwUnblockContact-template">
+    <h2>{{ __tr('Are You Sure!') }}</h2>
+    <p>{{ __tr('You want to unblock this Contact?') }}</p>
+</script>
+<!-- /Contact unblock template -->
+    
 <script>
 (function($) {
     'use strict';
+    window.isPageRefresh = false;
     window.messagePaginatePage = 1;
     window.searchValue = '';
     window.showUnreadContactsOnly = 0;
@@ -717,6 +805,11 @@
     window.updateManageLabelsList = function(responseData) {
         if(responseData.reaction == 1) {
             window.onUpdateContactDetails();
+        }
+    };
+    window.onUpdateLabels = function(responseData) {
+        if(responseData.reaction == 1) {
+            window.updateContactList();
         }
     };
     window.updateContactList();

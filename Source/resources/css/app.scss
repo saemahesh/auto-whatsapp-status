@@ -8,7 +8,7 @@ div.dataTables_wrapper {
             background-color: rgb(255 255 255 / 5%);
         }
     }
-    table.dataTable>tbody>tr:hover {
+    table.dataTable > tbody > tr:hover {
         background-color: #ededed;
     }
     @media (max-width: 1280px) {
@@ -86,10 +86,10 @@ a {
     width: 64px;
     height: 64px;
     margin: 8px;
-    border: 8px solid #fff;
+    border: 8px solid #9a9a9a;
     border-radius: 50%;
     animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-    border-color: #fff transparent transparent transparent;
+    border-color: #9a9a9a transparent transparent transparent;
 }
 
 .lds-ring div:nth-child(1) {
@@ -115,7 +115,7 @@ a {
 
 /* width */
 ::-webkit-scrollbar {
-    width: 4px;
+    width: 8px;
 }
 /* Track */
 ::-webkit-scrollbar-track {
@@ -189,9 +189,11 @@ label.custom-control-label {
 label.error,
 label.lw-validation-error,
 div.lw-validation-error {
-    width: 100%;
     color: #fb6340;
-    padding: 10px 0 10px 0;
+    padding: 4px 0;
+    width: 100%;
+    font-size: 15px;
+    text-align: right;
     .text-left & {
         text-align: left;
     }
@@ -203,11 +205,19 @@ label.lw-validation-error {
     padding: 0px 0 10px 18px;
 }
 
+.btn,
+.input-group,
+.form-control,
+.selectize-input,
+.card .card-body fieldset legend {
+    border-radius: 18px;
+}
+
 .btn {
     box-shadow: none;
-    border-radius: 4px;
+    // border-radius: 18px;
     font-weight: 400;
-    &.lw-btn-breakable{
+    &.lw-btn-breakable {
         word-break: break-word;
         white-space: normal;
     }
@@ -349,6 +359,14 @@ label {
 }
 .modal {
     transition: none;
+    .modal-content {
+        box-shadow: none !important;
+    }
+    @media (min-width: 1000px) {
+        .lw-modal-xl {
+            max-width: 1000px;
+        }
+    }
 }
 .modal-backdrop.show {
     opacity: 0.4;
@@ -357,18 +375,21 @@ label {
     background-color: #f6f8fa;
 }
 .modal-open .modal {
-    backdrop-filter: blur(4px) grayscale(0.9);
+    .close>span:not(.sr-only) {
+        font-size: 2.25rem;
+    }
+    backdrop-filter: blur(3px) grayscale(0.6);
     &.lw-has-form {
         .lw-form .lw-form-modal-body {
             padding: 1.5rem;
         }
-        .modal-footer,
+        // .modal-footer,
         .modal-body {
             border-bottom-left-radius: 0.4375rem;
             border-bottom-right-radius: 0.4375rem;
         }
         .modal-footer {
-            background-color: #ffffff;
+            // background-color: #ffffff;
         }
     }
     .modal-body .modal-header {
@@ -379,13 +400,23 @@ label {
             font-size: 1rem;
         }
     }
+    .modal-header {
+        // background-color: #d2dce7;
+        border-radius: 0;
+    }
+    .modal-footer {
+        // background-color: #ebedee;
+        border-radius: 0;
+        backdrop-filter: blur(3px);
+        padding: 18px 10px 10px 10px;
+    }
 }
 
 .btn-secondary {
     border-color: #e1e2e2;
 }
 
-.lw-form:not([data-show-processing=false]) {
+.lw-form:not([data-show-processing="false"]) {
     .lw-form-processing,
     &.lw-form-processing {
         * {
@@ -441,13 +472,16 @@ label {
 .selectize-input {
     padding: 14px 12px;
 }
-
+.selectize-dropdown {
+    z-index: 9999 !important;
+}
 // float selectize as in some cases its opened dropdown going under other element
 .selectize-dropdown,
 .selectize-dropdown.form-control {
-    position: relative;
-    top: 0 !important;
+    // position: relative;
+    // top: 0 !important;
     color: #333;
+    // z-index: 99999;
 }
 
 .lw-form-in-process {
@@ -462,7 +496,7 @@ label {
         align-self: center;
         align-items: center;
         display: flex;
-        color: rgb(255, 255, 255);
+        color: rgb(109, 109, 109);
         z-index: 1;
         border-radius: 8px;
         width: 100px;
@@ -487,17 +521,21 @@ fieldset {
     padding: 16px;
     margin-top: 20px;
     background-color: rgb(255 255 255 / 85%);
-    box-shadow: 0 0 1rem 0 rgba(136, 152, 170, 0.15);
+    // box-shadow: 0 0 1rem 0 rgba(136, 152, 170, 0.15);
     legend {
         font-size: 1.1rem;
         padding: 0 10px;
         width: auto;
-        color: #5f72e4;
+        color: #3f3f3f;
         border: 1px solid rgba(0, 0, 0, 0.1);
-        background-color: #fff;
+        background-color: rgba(0, 0, 0, 0.03);
         padding: 8px 12px;
         border-radius: 8px;
     }
+}
+
+.lw-dynamic-template-container {
+    overflow: auto !important;
 }
 
 #lwTemplateStructureContainer .card,
@@ -508,7 +546,7 @@ fieldset {
 .card-body {
     fieldset legend {
         border: 1px solid rgba(0, 0, 0, 0.1);
-        background-color: #fff;
+        background-color: rgba(0, 0, 0, 0.03);
         padding: 8px 12px;
         border-radius: 8px;
     }
@@ -569,7 +607,7 @@ h6 {
         // max-height: 120px;
         object-fit: contain;
     }
-    .navbar-vertical.navbar-expand-md .navbar-collapse{
+    .navbar-vertical.navbar-expand-md .navbar-collapse {
         align-items: start;
     }
 }
@@ -599,13 +637,13 @@ h6 {
         @media (prefers-color-scheme: dark) {
             .system-theme-light-logo {
                 display: none !important;
-              }
             }
-            @media (prefers-color-scheme: light) {
-                .system-theme-dark-logo{
-                    display: none !important;
-                }
+        }
+        @media (prefers-color-scheme: light) {
+            .system-theme-dark-logo {
+                display: none !important;
             }
+        }
     }
     .lw-btn-block-mobile,
     .btn.lw-btn-block-mobile {
@@ -639,15 +677,30 @@ h6 {
             .nav-link {
                 border-radius: 0;
             }
-            &:first-child .nav-link ,&:last-child .nav-link{
-                border-top-left-radius: 0.375rem;
-                border-top-right-radius: 0.375rem;
+            &:first-child .nav-link,
+            &:last-child .nav-link {
+                // border-top-left-radius: 0.375rem;
+                // border-top-right-radius: 0.375rem;
+                border-top-left-radius: 12px;
+                border-top-right-radius: 12px;
             }
 
             // &:last-child .nav-link {
             //     border-bottom-left-radius: 0.375rem;
             //     border-bottom-right-radius: 0.375rem;
             // }
+        }
+    }
+}
+
+.nav-tabs {
+    // margin-bottom: 20px;
+    .nav-item {
+        // width: 100%;
+        .nav-link {
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            margin-right: 2px;
         }
     }
 }
@@ -673,9 +726,10 @@ a.text-primary:hover {
 .navbar-light .navbar-nav .nav-link.active,
 .navbar-light .navbar-nav .nav-link.show,
 .navbar-light .navbar-nav .show > .nav-link {
-    color: #139343 ;
+    color: #139343;
 }
-#lwUploadFavicon,#lwUploadDarkThemeFavicon {
+#lwUploadFavicon,
+#lwUploadDarkThemeFavicon {
     width: 100px;
 }
 
@@ -743,7 +797,7 @@ a.text-primary:hover {
 .lw-form-card-box {
     backdrop-filter: blur(4px) grayscale(0.6);
     background-color: rgb(0 0 0 / 70%) !important;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23) !important;
+    // box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23) !important;
     @media (min-width: 767px) {
         margin-top: 6vh;
     }
@@ -795,11 +849,15 @@ a.text-primary:hover {
     }
 }
 .card {
-    box-shadow: 4px 4px 4px 1px rgba(0, 0, 0, 0.15);
+    // box-shadow: 4px 4px 4px 1px rgba(0, 0, 0, 0.15);
     border: 1px solid rgba(0, 0, 0, 0.15);
     background-color: rgb(255 255 255 / 80%);
     // background-color: rgb(255 255 255 / 50%);
     backdrop-filter: blur(2px);
+    border-radius: 25px;
+}
+.input-group-text {
+    background: transparent;
 }
 html > body {
     // efe7dd
@@ -816,7 +874,7 @@ nav.lw-breadcrumb-container {
 
 .nav-tabs {
     border-bottom: 0;
-    margin-left: 20px;
+    margin-left: 40px;
     margin-top: 20px;
     .nav-link {
         padding: 10px 1.75rem;
@@ -958,25 +1016,25 @@ fieldset.filepond--file-wrapper {
         max-width: 1320px;
     }
 }
-.lw-error-page-block-section{
+.lw-error-page-block-section {
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
-    .lw-error-logo{
+    .lw-error-logo {
         width: 280px;
         min-width: 300px;
     }
-.lw-error-page-block {
-    background: #fff;
-    border-radius: 14px;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgb(0 0 0 / 0%) !important;
-    border-bottom: 4px solid #2bac32 ;
-    p{
-        font-size: 19px;
-        font-weight: 400;
+    .lw-error-page-block {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgb(0 0 0 / 0%) !important;
+        border-bottom: 4px solid #2bac32;
+        p {
+            font-size: 19px;
+            font-weight: 400;
+        }
     }
-}
 }
 div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm,
 .dropdown-item.active,
@@ -1030,6 +1088,7 @@ div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm:focus {
             z-index: 2;
             width: 60px;
             overflow-x: hidden;
+            scrollbar-width: thin; /* Firefox specific */
             transition: width 0.15s ease;
             > .container-fluid {
                 width: 200px;
@@ -1110,18 +1169,18 @@ div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm:focus {
     white-space: pre-line;
     word-wrap: break-word;
 }
-.lw-page-dropdown{
+.lw-page-dropdown {
     background-color: transparent;
-    button{
+    button {
         background-color: white;
         box-shadow: none !important;
-        &:hover{
+        &:hover {
             transform: translateY(0px);
         }
     }
-    .dropdown-menu{
+    .dropdown-menu {
         min-width: 10rem;
-        box-shadow: 0 0 2rem 0 rgba(136, 152, 170, .15) !important;
+        box-shadow: 0 0 2rem 0 rgba(136, 152, 170, 0.15) !important;
     }
 }
 textarea.form-control {
@@ -1129,7 +1188,7 @@ textarea.form-control {
         width: 10px;
     }
 }
-.pay-box-padding{
+.pay-box-padding {
     padding: 5rem;
 }
 .lw-white-space-normal {
@@ -1141,7 +1200,7 @@ textarea.form-control {
     max-width: 100%;
     margin: 0 auto;
 }
-// 
+//
 fieldset legend {
     cursor: pointer;
 }
@@ -1151,8 +1210,8 @@ fieldset legend {
 .form-control {
     padding-left: 6px !important;
 }
-.selectize-control.form-control{
-    padding-left: 0!important;
+.selectize-control.form-control {
+    padding-left: 0 !important;
 }
 .display-2 {
     font-size: 2rem;
@@ -1161,13 +1220,13 @@ fieldset legend {
     font-size: 2em;
 }
 .btn {
-    font-size: .8rem;
+    font-size: 0.8rem;
 }
 .dataTables_wrapper {
     .table td,
     .table th {
         font-size: 0.9rem;
-        .btn-group-sm>.btn,
+        .btn-group-sm > .btn,
         .btn-sm {
             font-size: 0.7rem;
         }
@@ -1176,64 +1235,75 @@ fieldset legend {
 .navbar-vertical .navbar-nav .nav-link {
     font-size: 0.9rem;
 }
-.navbar-vertical.navbar-expand-md .navbar-nav{
+.navbar-vertical.navbar-expand-md .navbar-nav {
     margin-right: -1rem;
     margin-left: -1rem;
 }
-.lw-has-form fieldset .input-group{
+.lw-has-form fieldset .input-group {
     border: 1px solid #ddd;
-    .lw-form-field.form-control{
+    .lw-form-field.form-control {
         border: none !important;
     }
-    .input-group-append{
+    .input-group-append {
         margin-left: 0;
     }
 }
-.modal .modal-body .form-control{
+.modal .modal-body .form-control {
     font-size: 0.9rem;
 }
 
-.dropdown-menu .active a {
-    background-color: #b1b3ad; /* or any color you prefer */
-    font-weight: bold;
+.dropdown-menu {
+    border-radius: 12px;
+    .active a {
+        background-color: #b1b3ad; /* or any color you prefer */
+        font-weight: bold;
+    }
 }
 @media (max-width: 768px) {
-    .lw-language-block .form-control,.lw-language-block .input-group-text{
-    border: 1px solid #cad1d7 !important;
-   } 
-   .lw-mobile-btn-block{
-    width: auto !important;
-   }
-   .lw-mobile-view-none{
-    display: none !important;
-   }
-   .lw-language-block .input-group * {
-    width: 100%;
-    display: block;
-    border-radius: 4px;
-    margin: 8px 0 0 0;
-    border-radius: 0.375rem !important;
-}
+    .lw-language-block .form-control,
+    .lw-language-block .input-group-text {
+        border: 1px solid #cad1d7 !important;
+    }
+    .lw-mobile-view-none {
+        display: none !important;
+    }
+    .lw-language-block .input-group * {
+        width: 100%;
+        display: block;
+        border-radius: 4px;
+        margin: 8px 0 0 0;
+        border-radius: 0.375rem !important;
+    }
 }
 
 @media (prefers-color-scheme: dark) {
-    .system-theme-light-logo ,.system-theme-light-small-logo{
+    .system-theme-light-logo,
+    .system-theme-light-small-logo {
         display: none !important;
-      }
     }
-    @media (prefers-color-scheme: light) {
-        .system-theme-dark-logo, .system-theme-dark-small-logo{
-            display: none !important;
-        }
+    .campaign-text-color {
+        color: #d1d1d1;
     }
-.card-top-img{
+}
+@media (prefers-color-scheme: light) {
+    .system-theme-dark-logo,
+    .system-theme-dark-small-logo {
+        display: none !important;
+    }
+    .campaign-text-color {
+        color: #525f7f;
+    }
+}
+.card-top-img {
     width: 200px;
 }
-.lw-mobile-app{
+.lw-mobile-app {
     text-align: left;
-    white-space: pre-line;
+    white-space: pre-wrap;
     padding: 15px !important;
-    height: 75vh !important;
+    min-height: 75vh !important;
+    overflow: auto;
+    height: auto;
 }
 @media (max-width: 768px) {
     .input-group {
@@ -1252,35 +1322,37 @@ fieldset legend {
             border: 1px solid #cad1d7;
         }
     }
-    .form-control{
-        border: 1px solid #cad1d7 !important; 
+    .form-control {
+        border: 1px solid #cad1d7 !important;
     }
-    .selectize-control.lw-form-field.form-control.single{
-border: none !important;
+    .selectize-control.lw-form-field.form-control.single {
+        border: none !important;
     }
-    
 }
-.navbar-light .navbar-nav .nav-link:hover, .navbar-light .navbar-nav .nav-link.active, .active > .navbar-light .navbar-nav .nav-link ,.navbar-light .navbar-nav .active > .nav-link{
-    background: #9484841f  !important;
-  }
-  .card.lw-subscription-cards{
+.navbar-light .navbar-nav .nav-link:hover,
+.navbar-light .navbar-nav .nav-link.active,
+.active > .navbar-light .navbar-nav .nav-link,
+.navbar-light .navbar-nav .active > .nav-link {
+    background: #9484841f !important;
+}
+.card.lw-subscription-cards {
     border-radius: 6px !important;
     border: none;
     box-shadow: 0 0.25rem 0.875rem 0 rgba(38, 43, 67, 0.16) !important;
-    .card-header:first-child{
+    .card-header:first-child {
         border-radius: 6px;
         color: black;
     }
-  }
-  .lw-position-block{
+}
+.lw-position-block {
     position: absolute;
     @media (max-width: 992px) {
         position: relative;
     }
-  }
-.lw-top-spacing-block{
+}
+.lw-top-spacing-block {
     margin-top: 2.8rem;
-    button{
+    button {
         padding: 15px 0;
     }
     @media (max-width: 992px) {
@@ -1288,12 +1360,265 @@ border: none !important;
     }
 }
 @media (max-width: 500px) {
-.dataTables_wrapper .page-item .page-link{
-    height: 33px;
-    margin: 0 3px;
-    padding: 6px;
+    .dataTables_wrapper .page-item .page-link {
+        height: 33px;
+        margin: 0 3px;
+        padding: 6px;
+    }
+}
+.campaign-text-color {
+    color: #525f7f;
+}
+
+.lw-stripe-payment-list-container {
+    max-height: 430px;
+    overflow: auto;
+}
+
+.modal {
+  .modal-dialog {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    transform: translateX(100%);
+    transition: transform 0.4s ease-in-out;
+    background-color: white;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+
+    min-width: 100%;
+    max-width: 100%;
+
+    @media (min-width: 576px) {
+      min-width: 400px;
+      max-width: 90vw;
+    }
+
+    @media (min-width: 768px) {
+      min-width: 500px;
+      max-width: 70vw;
+    }
+
+    @media (min-width: 992px) {
+      min-width: 600px;
+      max-width: 50vw;
+    }
+
+    @media (min-width: 1200px) {
+      min-width: 600px;
+      max-width: 40vw;
+    }
+  }
+
+  &.show .modal-dialog {
+    transform: translateX(0);
+  }
+
+  &.slide-out:not(.show) .modal-dialog {
+    transform: translateX(100%);
+  }
+
+  .modal-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    .modal-body {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding-bottom: 100px !important;
+    }
+  }
+
+  .modal-footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1;
+  }
+}
+
+.modal-backdrop.show {
+  opacity: 0.4;
+  transition: none;
+}
+
+.modal {
+  &.show .modal-dialog {
+    transform: translateX(0);
+  }
+
+  &.slide-out .modal-dialog {
+    transform: translateX(100%);
+    transition: transform 0.4s ease-in-out;
+  }
+}
+
+
+html > body.modal-open {
+    padding-right: 8px !important;
+    .modal.lw-has-form .modal-footer {
+        // background-color: rgba(255, 255, 255, 0.8);
+    }
+    @media (max-width: 799px) {
+    .modal .modal-dialog {
+        // min-width: 100%;
+        // max-width: 100%;
+    }
 }
 }
-.campaign-text-color{
-color: #525f7f;
+.main-content #navbar-main {
+    position: fixed !important;
+    padding-left: 50px !important;
 }
+body:not(.lw-minimized-menu) {
+    .main-content #navbar-main {
+        margin-left: 250px!important;
+        width: calc(100% - 250px) !important;
+        padding-left: 0 !important;
+    }
+}
+[dir="rtl"] {
+    #sidenav-collapse-main .navbar-nav {
+        padding-right: 0px;
+        margin-right: -20px;
+    }
+}
+
+.btn:not(.btn-block) {
+  width: 100%;
+  touch-action: manipulation;
+}
+
+/* Fix: Don't break layout in input groups */
+.input-group .btn {
+  width: auto;
+  display: inline-block;
+}
+
+/* Responsive override: wider screens show inline buttons */
+@media (min-width: 576px) {
+  .btn:not(.btn-block) {
+    display: inline-block;
+    width: auto;
+  }
+}
+
+/* Carousel Related Css here */
+.lw-carousel-wrapper {
+    position: relative;
+    width: 100%; /* wrapper takes 68% width */
+}
+
+.lw-carousel-container {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 12px;
+    padding: 10px;
+}
+
+.lw-carousel-card {
+    flex: 0 0 105%; /* only one card fills wrapper */
+    background: #fff;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Replace image with icon container */
+.lw-card-media {
+    width: calc(100% - 20px);  /* keep inset inside card */
+    height: 180px;
+    background: #ccd0d5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 10px;
+    border-radius: 12px;
+    padding: 2px; /* <-- gap from all sides for the icon */
+}
+
+.lw-card-media i {
+    font-size: 64px;
+    color: white;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.lw-carousel-card-body {
+    padding: 10px 12px;
+    flex: 1;
+}
+
+.lw-card-desc {
+    font-size: 13px;
+    color: #3b4a54;
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+/* Hide scrollbar */
+.lw-carousel-container::-webkit-scrollbar {
+    display: none;
+}
+.lw-carousel-container {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Arrow buttons */
+.lw-carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgba(211, 211, 211, 0.4); /* 40% opacity */
+    border: 2px solid rgba(211, 211, 211, 0.4);
+    color: #333; /* dark text for contrast */
+    border: none;
+    font-size: 24px;
+    padding: 0px 15px;
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    z-index: 10;
+    transition: background 0.2s;
+    height: 40px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px); /* glass effect */
+}
+
+.lw-carousel-arrow:hover {
+    background-color: rgba(211, 211, 211, 0.2); /* even more transparent */
+    border-color: #000; /* black border */
+    color: #000; /* make text black for stronger contrast */
+}
+
+.lw-carousel-arrow:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.lw-carousel-arrow::-moz-focus-inner {
+    border: 0;
+}
+
+.lw-carousel-arrow.prev { left: -20px; }
+.lw-carousel-arrow.next { right: -20px; }
+
+@media (max-width: 600px) {
+    .lw-carousel-arrow {
+    display: none; /* hide arrows on mobile */
+    }
+}
+/* Carousel Related Css here */

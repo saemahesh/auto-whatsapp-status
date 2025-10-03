@@ -1,9 +1,28 @@
 <?php
 /**
-* ContactController.php - Controller file
-*
-* This file is part of the Contact component.
-*-----------------------------------------------------------------------------*/
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+
+/**
+ * ContactController.php - Controller file
+ *
+ * This file is part of the Contact component.
+ *-----------------------------------------------------------------------------*/
 
 namespace App\Yantrana\Components\Contact\Controllers;
 
@@ -118,6 +137,32 @@ class ContactController extends BaseController
         // get back to controller with engine response
         return $this->processResponse($processReaction, [], [], true);
     }
+
+    /**
+     * Process Delete All Contacts
+     *
+     * @param  BaseRequest  $request
+     *
+     * @return json object
+     *---------------------------------------------------------------- */
+    public function deleteAllContact(BaseRequest $request)
+    {
+        validateVendorAccess('manage_contacts');
+
+        // restrict demo user
+        if (isDemo() and isDemoVendorAccount()) {
+            return $this->processResponse(22, [
+                22 => __tr('Functionality is disabled in this demo.')
+            ], [], true);
+        }
+
+        // ask engine to process the request
+        $processReaction = $this->contactEngine->processDeleteAllContact($request);
+
+        // get back to controller with engine response
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
     /**
      * Selected Contacts delete process
      *
@@ -155,9 +200,10 @@ class ContactController extends BaseController
                 'required',
                 'numeric',
                 'min_digits:9',
+                'max_digits:20',
                 'min:1',
                 'doesnt_start_with:+,0',
-                Rule::unique('contacts', 'wa_id')->where(fn (Builder $query) => $query->where('vendors__id', getVendorId()))
+                Rule::unique('contacts', 'wa_id')->where(fn(Builder $query) => $query->where('vendors__id', getVendorId()))
             ],
             'email' => 'nullable|email',
         ]);
@@ -193,7 +239,7 @@ class ContactController extends BaseController
                 'min_digits:9',
                 'min:1',
                 'doesnt_start_with:+,0',
-                Rule::unique('contacts', 'wa_id')->where(fn (Builder $query) => $query->where('vendors__id', getVendorId()))
+                Rule::unique('contacts', 'wa_id')->where(fn(Builder $query) => $query->where('vendors__id', getVendorId()))
             ],
             'email' => 'nullable|email',
         ]);
@@ -241,6 +287,37 @@ class ContactController extends BaseController
     }
 
     /**
+     * API Assign Team Member to Contact
+     *
+     * @param  object BaseRequest $request
+     * @return json object
+     *---------------------------------------------------------------- */
+    public function apiAssignTeamMemberToContact(BaseRequest $request, $vendorUid)
+    {
+        validateVendorAccess('manage_contacts');
+        // process the validation based on the provided rules
+        $request->validate([
+            'username_or_email' => 'required',
+            "phone_number" => [
+                'required',
+                'numeric',
+                'min_digits:9',
+                'min:1',
+                'doesnt_start_with:+,0'
+            ]
+        ]);
+        
+        // ask engine to process the request
+        $processReaction = $this->contactEngine->processAssignChatUser($request);
+        if ($processReaction->success()) {
+            // get back with response
+            return $this->processApiResponse($processReaction, $processReaction->data());
+        }
+
+        return $this->processApiResponse($processReaction, $processReaction->data());
+    }
+
+    /**
      * Contact get update data
      *
      * @param  mix  $contactIdOrUid
@@ -248,7 +325,10 @@ class ContactController extends BaseController
      *---------------------------------------------------------------- */
     public function updateContactData($contactIdOrUid)
     {
-        validateVendorAccess('manage_contacts');
+        validateVendorAccess([
+            'messaging', 
+            'assigned_chats_only'
+        ]);
         // ask engine to process the request
         $processReaction = $this->contactEngine->prepareContactUpdateData($contactIdOrUid);
 
@@ -298,10 +378,13 @@ class ContactController extends BaseController
      * @param string $exportType
      * @return file
      */
-    public function exportContacts($exportType = null)
+    public function exportContacts($exportType = null, $fileType = null)
     {
 
         validateVendorAccess('manage_contacts');
+        if ($fileType == 'csv') {
+            return $this->contactEngine->processExportCSVContacts($exportType);
+        }
         return $this->contactEngine->processExportContacts($exportType);
     }
 
@@ -333,6 +416,30 @@ class ContactController extends BaseController
     }
 
     /**
+     * Import Contacts
+     *
+     * @param BaseRequestTwo $request
+     * @return json
+     */
+    public function abortImportContacts(BaseRequestTwo $request)
+    {
+        validateVendorAccess('manage_contacts');
+        // restrict demo user
+        if (isDemo() and isDemoVendorAccount()) {
+            return $this->processResponse(22, [
+                22 => __tr('Functionality is disabled in this demo.')
+            ], [], true);
+        }
+
+        return $this->processResponse(
+            $this->contactEngine->processAbortImportContacts($request),
+            [],
+            [],
+            true
+        );
+    }
+
+    /**
      * Contact process update
      *
      * @param  object BaseRequest $request
@@ -341,12 +448,25 @@ class ContactController extends BaseController
     public function assignChatUser(BaseRequest $request)
     {
         validateVendorAccess('messaging');
-        // process the validation based on the provided rules
-        $request->validate([
-            'contactIdOrUid' => 'required|uuid',
-        ]);
-        // ask engine to process the request
-        $processReaction = $this->contactEngine->processAssignChatUser($request);
+        
+        $isBulkAction = data_get($request, 'bulk_action');
+        
+        if ($isBulkAction == true) {
+            // process the validation based on the provided rules
+            $request->validate([
+                'contactIdOrUid' => 'string',
+            ]);
+            // ask engine to process the request
+            $processReaction = $this->contactEngine->processAssignTeamMemberInBulk($request->all());
+        } else {
+            // process the validation based on the provided rules
+            $request->validate([
+                'contactIdOrUid' => 'required|uuid',
+            ]);
+            // ask engine to process the request
+            $processReaction = $this->contactEngine->processAssignChatUser($request);
+        }
+        
         // get back with response
         return $this->processResponse($processReaction, [], [], true);
     }
@@ -409,7 +529,7 @@ class ContactController extends BaseController
             'title' => [
                 'required',
                 'max:45',
-                Rule::unique('labels')->where(fn (Builder $query) => $query->where('vendors__id', getVendorId()))
+                Rule::unique('labels')->where(fn(Builder $query) => $query->where('vendors__id', getVendorId()))
             ],
             'text_color' => [
                 'nullable',
@@ -442,7 +562,7 @@ class ContactController extends BaseController
             'title' => [
                 'required',
                 'max:45',
-                Rule::unique('labels')->where(fn (Builder $query) => $query->where('vendors__id', getVendorId()))->ignore($request->labelUid, '_uid')
+                Rule::unique('labels')->where(fn(Builder $query) => $query->where('vendors__id', getVendorId()))->ignore($request->labelUid, '_uid')
             ],
             'text_color' => [
                 'nullable',
@@ -500,6 +620,67 @@ class ContactController extends BaseController
             ],
         ]);
         $processReaction = $this->contactEngine->processDeleteLabel($labelUid);
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
+    /**
+     * Block contact
+     *
+     * @param BaseRequestTwo $request
+     * @return json
+     */
+    public function processContactBlock(BaseRequestTwo $request, $contactIdOrUid)
+    {
+        validateVendorAccess('messaging');
+        $request->merge([
+            'contactIdOrUid' => $request->contactIdOrUid
+        ]);
+        $request->validate([
+            'contactIdOrUid' => [
+                'required',
+                'uuid',
+            ],
+        ]);
+
+        $processReaction = $this->contactEngine->processBlockContact($contactIdOrUid);
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
+    /**
+     * Unblock contact
+     *
+     * @param BaseRequestTwo $request
+     * @return json
+     */
+    public function processContactUnblock(BaseRequestTwo $request, $contactIdOrUid)
+    {
+        validateVendorAccess('messaging');
+        $request->merge([
+            'contactIdOrUid' => $request->contactIdOrUid
+        ]);
+        $request->validate([
+            'contactIdOrUid' => [
+                'required',
+                'uuid',
+            ],
+        ]);
+
+        $processReaction = $this->contactEngine->processUnblockContact($contactIdOrUid);
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
+    /**
+    * Prepare team member list data
+    *
+    * @return  json object
+    *---------------------------------------------------------------- */
+
+    public function prepareTeamMemberList($contactIdOrUid)
+    {
+        validateVendorAccess('administrative');
+        // ask engine to process the request
+        $processReaction = $this->contactEngine->prepareTeamMemberListData($contactIdOrUid);
+        // get back to controller with engine response
         return $this->processResponse($processReaction, [], [], true);
     }
 }

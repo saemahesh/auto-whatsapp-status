@@ -181,7 +181,7 @@
                         <div class="btn-group mb-2">
                             <!-- bulk action btn -->
                             <button :class="!selectedContacts.length ? 'disabled' : ''"
-                                class="btn btn-danger mt-1 btn-sm dropdown-toggle lw-mobile-btn-block" type="button" data-toggle="dropdown"
+                                class="btn btn-danger mt-1 btn-sm dropdown-toggle" type="button" data-toggle="dropdown"
                                 aria-expanded="false">
                                 {{ __tr('Bulk Actions') }}
                             </button>

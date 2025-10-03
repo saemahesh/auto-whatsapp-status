@@ -829,6 +829,13 @@
                         responseCallback(successResponse, options.callbackParams, $thisScope);
                     }
 
+                    if ($thisScope.hasClass('lw-action-change-url')) {
+                        // set the window title
+                        document.title = $thisScope.data('title') ? $thisScope.data('title').trim() : $thisScope.text().trim();
+                        // set the url
+                        window.history.pushState(successResponse, "", requestURL);
+                    }
+
                     // Post callback event for before sending request
                     if (options.callbackEvent) {
                         // Trigger the event. Do not use dot in name
@@ -902,13 +909,13 @@
                         return false;
                     }
                     // note: __pr not working here use console.log
-                    var responseJSON = requestResponse.responseJSON ? requestResponse.responseJSON : __DataRequest.__processEventStreamFinalData(requestResponse.responseText, options);
+                    var responseJSON = (requestResponse && requestResponse.responseJSON) ? requestResponse.responseJSON : __DataRequest.__processEventStreamFinalData(requestResponse.responseText, options);
                     var responseData = __InputSecurity.processResponseData(responseJSON);
                     _thisDeferred.resolve(_.assign(requestResponse, {
                         responseJSON: responseData
                     }));
                     // don't remove the disabled attribute and form in process class if response is for redirect
-                    if ((responseData.reaction == 21) || (responseData.response_action && (responseData.response_action.type == 'redirect'))) {
+                    if ((responseData && responseData.reaction == 21) || (responseData && responseData.response_action && (responseData.response_action.type == 'redirect'))) {
                     } else {
                         $thisScope.prop('disabled', false).removeClass('disabled');
                         $thisScope.data('is-request-processing', false).removeClass('lw-form-processing');
@@ -978,7 +985,7 @@
                 var modifiedData = JSON.parse("[" + requestResponse.replaceAll('}{', '},{') + "]");
                 return modifiedData[modifiedData.length - 1];
             } else {
-                if (requestResponse.responseText) {
+                if (requestResponse && requestResponse.responseText) {
                     try {
                         return $.parseJSON(requestResponse.responseText);
                     } catch (error) {
@@ -1169,7 +1176,7 @@
             var args = Array.prototype.slice.call(arguments);
 
             for (var i = 0; i < args.length; ++i) {
-                console.debug(args[i]);
+                console.log(args[i]);
             }
 
             console.groupCollapsed("-------------------------------------------------- JS __pr END");

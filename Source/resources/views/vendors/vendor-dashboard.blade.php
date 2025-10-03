@@ -51,32 +51,27 @@ $vendorViewBySuperAdmin = null;
 <div class="container-fluid">
     @if (getVendorSettings('whatsapp_access_token_expired', null, null, $vendorIdOrUid))
     <div class="alert alert-danger">
-        {{ __tr('Your WhatsApp token seems to be expired, Generate new token, prefer creating permanent token and
-        save.') }}
+        {{ __tr('Your WhatsApp token seems to be expired, Generate new token, prefer creating permanent token and save.') }}
         <br>
         <a class="btn btn-sm btn-white my-2"
-            href="{{ route('vendor.settings.read', ['pageType' => 'whatsapp-cloud-api-setup']) }}">{{ __tr('Cloud API
-            setup') }}</a>
+            href="{{ route('vendor.settings.read', ['pageType' => 'whatsapp-cloud-api-setup']) }}">{{ __tr('Cloud API setup') }}</a>
     </div>
     @elseif (!isWhatsAppBusinessAccountReady($vendorIdOrUid))
     <div class="alert alert-danger">
         {{ __tr('You are not ready to send messages, WhatsApp Setup is Incomplete') }}
         <br>
         <a class="btn btn-sm btn-white my-2"
-            href="{{ route('vendor.settings.read', ['pageType' => 'whatsapp-cloud-api-setup']) }}">{{ __tr('Complete
-            your WhatsApp Cloud API setup') }}</a>
+            href="{{ route('vendor.settings.read', ['pageType' => 'whatsapp-cloud-api-setup']) }}">{{ __tr('Complete your WhatsApp Cloud API setup') }}</a>
     </div>
     @endif
     @if (getAppSettings('pusher_by_vendor') and !getVendorSettings('pusher_app_id', null, null, $vendorIdOrUid))
     <div class="alert alert-warning">
-        {{ __tr('Pusher keys needs to setup for realtime communication like Chat etc., You can get it from
-        __pusherLink__, choose channel and create the app to get the required keys.', [
+        {{ __tr('Pusher keys needs to setup for realtime communication like Chat etc., You can get it from __pusherLink__, choose channel and create the app to get the required keys.', [
         '__pusherLink__' => '<a target="blank" href="https://pusher.com">pusher.com</a>'
         ]) }}
         <br>
         <a class="btn btn-sm btn-white my-2"
-            href="{{ route('vendor.settings.read', ['pageType' => 'general']) }}#pusherKeysConfiguration">{{
-            __tr('Pusher Configuration') }}</a>
+            href="{{ route('vendor.settings.read', ['pageType' => 'general']) }}#pusherKeysConfiguration">{{ __tr('Pusher Configuration') }}</a>
     </div>
     @endif
     @if(!$vendorViewBySuperAdmin)
@@ -93,16 +88,13 @@ $vendorViewBySuperAdmin = null;
                                 __tr('WhatsApp Cloud API Setup').'</a>'
                             ]) !!}</li>
                         <li>{!! __tr('Manage and Sync WhatsApp templates at __manageContactsLink__',[
-                            '__manageContactsLink__' => '<a
-                                href="'. route('vendor.whatsapp_service.templates.read.list_view') .'">'. __tr('Manage
-                                WhatsApp Templates').'</a>'
+                            '__manageContactsLink__' => '<a href="'. route('vendor.whatsapp_service.templates.read.list_view') .'">'. __tr('Manage WhatsApp Templates').'</a>'
                             ]) !!}</li>
                         <li>{!! __tr('Create your contact groups using __manageGroupsLink__', [
                             '__manageGroupsLink__' => '<a href="'. route('vendor.contact.group.read.list_view') .'">'.
                                 __tr('Manage Groups').'</a>'
                             ]) !!}</li>
-                        <li>{!! __tr('Create your Contacts or Upload excel file with predefined exportable template at
-                            __manageContactsLink__',[
+                        <li>{!! __tr('Create your Contacts or Upload excel file with predefined exportable template at __manageContactsLink__',[
                             '__manageContactsLink__' => '<a href="'. route('vendor.contact.read.list_view') .'">'.
                                 __tr('Manage Contacts').'</a>'
                             ]) !!}</li>

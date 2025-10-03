@@ -2,14 +2,15 @@
     "use strict";
     var fields = [];
     var patternToSearchInputField = /\{\{(\d+)\}\}/g;
+    const el = document.getElementById('lwNewTemplateData');
     $("#lwTemplateBody").on("input", function() {
         // Get the input value
         var inputValue = $(this).val();
-        updatePlaceholders(inputValue);
+        updatePlaceholders(inputValue, 'lwTemplateBody', 'headerTemplate');
     });
 
     $('#lwAddPlaceHolder').click(function() {
-        addNewPlaceholder();
+        addNewPlaceholder('lwTemplateBody', 'headerTemplate');
     });
     $("#lwHeaderTextBody").on("input", function() {
         // Get the input value
@@ -34,22 +35,23 @@
     });
 
     $('#lwBoldBtn').click(function() {
-        wrapWithItem('*');
+        wrapWithItem('*', 'lwTemplateBody', 'headerTemplate');
     });
     $('#lwItalicBtn').click(function() {
-        wrapWithItem('_');
+        wrapWithItem('_', 'lwTemplateBody', 'headerTemplate');
     });
     $('#lwStrikeThroughBtn').click(function() {
-        wrapWithItem('~');
+        wrapWithItem('~', 'lwTemplateBody', 'headerTemplate');
     });
     $('#lwCodeBtn').click(function() {
-        wrapWithItem('```');
+        wrapWithItem('```', 'lwTemplateBody', 'headerTemplate');
     });
 
-    function updatePlaceholders(text) {
+    window.updatePlaceholders = function(text, targetId, whatsappTemplateType) {
         const placeholderRegex = /\{\{\d+\}\}/g;
         let newText = updateSequence(text, placeholderRegex);
-        $('#lwTemplateBody').val(newText);
+        $('#'+targetId).val(newText);
+        let element = document.getElementById(targetId);
         var res = {};
         var matches = newText.match(patternToSearchInputField);
         if (matches) {
@@ -59,16 +61,28 @@
                     'text_variable_value': matches[i],
                 };
                 res[matches[i].replace(/\{\{(\d+)\}\}/g, '$1')] = newArr;
-                // Your code to handle each matched pattern goes here
-                __DataRequest.updateModels({newBodyTextInputFields : res});
+                if (whatsappTemplateType == 'headerTemplate') {
+                    // Your code to handle each matched pattern goes here
+                    __DataRequest.updateModels({newBodyTextInputFields : res});
+                } else if (whatsappTemplateType == 'carouselTemplate') {
+                    __DataRequest.updateModels({carouselBodyTextVariables : res});
+                } else if (_.isObject(whatsappTemplateType) && whatsappTemplateType.type == 'carouselCard') {
+                    Alpine.$data(el).carouselTemplateContainer[whatsappTemplateType.index]['bodyTextVariables'] = res;
+                }
             }
-        } else{
-            __DataRequest.updateModels({newBodyTextInputFields : res});
+        } else {        
+            if (whatsappTemplateType == 'headerTemplate') {
+                __DataRequest.updateModels({newBodyTextInputFields : res});
+            } else if (whatsappTemplateType == 'carouselTemplate') {
+                __DataRequest.updateModels({carouselBodyTextVariables : res});
+            } else if (_.isObject(whatsappTemplateType) && whatsappTemplateType.type == 'carouselCard') {
+                Alpine.$data(el).carouselTemplateContainer[whatsappTemplateType.index]['bodyTextVariables'] = res;
+            }
         }
     }
 
-function addNewPlaceholder() {
-    let textarea = $('#lwTemplateBody');
+window.addNewPlaceholder = function(targetId, whatsappTemplateType) {
+    let textarea = $('#'+targetId);
     let currentText = textarea.val();
     let cursorPos = textarea.prop('selectionStart');
     const placeholderRegex = /\{\{\d+\}\}/g;
@@ -89,12 +103,18 @@ function addNewPlaceholder() {
     let newPos = cursorPos + ` {{${maxNumber + 1}}} `.length;
     textarea[0].selectionStart = textarea[0].selectionEnd = newPos;
     textarea.focus(); // refocus the textarea after manipulation
-    $('#lwTemplateBody').trigger('input');
-    __DataRequest.updateModels({text_body:newText});
+    $('#'+targetId).trigger('input');
+    if (whatsappTemplateType == 'headerTemplate') {
+        __DataRequest.updateModels({text_body:newText});
+    } else if (whatsappTemplateType == 'carouselTemplate') {
+        __DataRequest.updateModels({carousel_body_text:newText});        
+    } else if (_.isObject(whatsappTemplateType) && whatsappTemplateType.type == 'carouselCard') {
+        Alpine.$data(el).carouselTemplateContainer[whatsappTemplateType.index]['bodyText'] = newText;
+    }
 }
 
-    function wrapWithItem(wrapWith) {
-        let $textarea = $('#lwTemplateBody');
+window.wrapWithItem = function(wrapWith, targetId, whatsappTemplateType) {
+        let $textarea = $('#'+targetId);
         let start = $textarea[0].selectionStart;
         let end = $textarea[0].selectionEnd;
         let selectedText = $textarea.val().substring(start, end);
@@ -105,8 +125,14 @@ function addNewPlaceholder() {
         // Update the cursor to be at the end of the newly wrapped text
         $textarea[0].selectionStart = $textarea[0].selectionEnd = start + selectedText.length + 2;
         $textarea.focus(); // Refocus the textarea after manipulation
-        $('#lwTemplateBody').trigger('input');
-        __DataRequest.updateModels({text_body:newText});
+        $('#'+targetId).trigger('input');
+        if (whatsappTemplateType == 'headerTemplate') {
+            __DataRequest.updateModels({text_body:newText});
+        } else if (whatsappTemplateType == 'carouselTemplate') {
+            __DataRequest.updateModels({carousel_body_text:newText}); 
+        } else if (_.isObject(whatsappTemplateType) && whatsappTemplateType.type == 'carouselCard') {
+            Alpine.$data(el).carouselTemplateContainer[whatsappTemplateType.index]['bodyText'] = newText;
+        }
     }
 
     function updateSequence(text, regex) {
@@ -130,4 +156,48 @@ function addNewPlaceholder() {
         }
         return text;
     };
+
+    window.scrollSlide = function(button, next = true) {
+        const wrapper = button.closest('.lw-carousel-wrapper');
+        const container = wrapper.querySelector('.lw-carousel-container');
+        const cards = container.querySelectorAll('.lw-carousel-card');
+        
+        const card = cards[0];
+        const scrollAmount = card.offsetWidth + 12; // card width + gap
+        container.scrollBy({ 
+            left: next ? scrollAmount : -scrollAmount, 
+            behavior: 'smooth' 
+        });
+    }
+
+/* 
+ * Carousel Related functions start here 
+ * ------------------------------------------*/
+
+// Carousel Template Body Textarea code start here
+$("#lwCarouselTemplateBody").on("input", function() {
+    // Get the input value
+    var inputValue = $(this).val();
+    updatePlaceholders(inputValue, 'lwCarouselTemplateBody', 'carouselTemplate');
+});
+
+$('#lwCarouselAddPlaceHolder').click(function() {
+    addNewPlaceholder('lwCarouselTemplateBody', 'carouselTemplate');
+});
+
+$('#lwCarouselBoldBtn').click(function() {
+    wrapWithItem('*', 'lwCarouselTemplateBody', 'carouselTemplate');
+});
+$('#lwCarouselItalicBtn').click(function() {
+    wrapWithItem('_', 'lwCarouselTemplateBody', 'carouselTemplate');
+});
+$('#lwCarouselStrikeThroughBtn').click(function() {
+    wrapWithItem('~', 'lwCarouselTemplateBody', 'carouselTemplate');
+});
+$('#lwCarouselCodeBtn').click(function() {
+    wrapWithItem('```', 'lwCarouselTemplateBody', 'carouselTemplate');
+});
+// Carousel Template Body Textarea code end here
+
+/* Carousel Related functions end here */
 })(jQuery);

@@ -7,7 +7,7 @@ $onlyTemplatePreview = request()->has('only-preview');
         <input type="hidden" name="template_uid" value="{{ $template->_uid }}">
         <fieldset>
             <legend>{{ __tr('Template') }} <template x-if="selectedTemplate">
-                    <button class="btn btn-dark btn-sm" @click.prevent="selectedTemplate = ''">{{ __tr('Change')
+                    <button class="btn btn-dark btn-sm lw-change-template-btn" @click.prevent="selectedTemplate = ''">{{ __tr('Change')
                         }}</button>
                 </template></legend>
             <h3><strong>{{ $template->template_name }}</strong></h3>
@@ -45,7 +45,7 @@ $onlyTemplatePreview = request()->has('only-preview');
                 <input id="lwHeaderImageFilepond" type="file" data-allow-revert="true"
                     data-label-idle="{{ __tr('Select Image') }}" class="lw-file-uploader" data-instant-upload="true"
                     data-action="<?= route('media.upload_temp_media', 'whatsapp_image') ?>" data-allowed-media='{{ getMediaRestriction('whatsapp_image') }}'
-                    data-file-input-element="#lwHeaderImage">
+                    data-file-input-element="#lwHeaderImage"<?= ($pageType == 'bot_reply_form') ? "data-lw-plugin=\"lwUploader\"" : ''; ?>>
                 <input id="lwHeaderImage" type="hidden" value="" name="header_image" />
             </div>
             @elseif($headerFormat == 'VIDEO')
@@ -54,7 +54,7 @@ $onlyTemplatePreview = request()->has('only-preview');
                 <input id="lwHeaderVideoFilepond" type="file" data-allow-revert="true"
                     data-label-idle="{{ __tr('Select Video') }}" class="lw-file-uploader" data-instant-upload="true"
                     data-action="<?= route('media.upload_temp_media', 'whatsapp_video') ?>" data-allowed-media='{{ getMediaRestriction('whatsapp_video') }}'
-                    data-file-input-element="#lwHeaderVideo">
+                    data-file-input-element="#lwHeaderVideo"<?= ($pageType == 'bot_reply_form') ? "data-lw-plugin=\"lwUploader\"" : ''; ?>>
                 <input id="lwHeaderVideo" type="hidden" value="" name="header_video" />
             </div>
             @elseif($headerFormat == 'DOCUMENT')
@@ -109,6 +109,93 @@ $onlyTemplatePreview = request()->has('only-preview');
         </fieldset>
         @endif
         {{-- /Button Variables --}}
+
+        @if(!__isEmpty($carouselTemplateData))
+            <fieldset>
+                <legend>{{ __tr('Cards') }}</legend>
+                @foreach ($carouselTemplateData[1]['cards'] as $cardIndex => $cardItem)
+                    <fieldset>
+                        <legend>{{ $cardIndex + 1 }}</legend>
+                        @if($cardItem['components'][0]['type'] == 'HEADER')
+                            <h3><u>{{ __tr('Media Header') }}</u></h3>
+                            <input id="lwUploadMediaType" type="hidden" value="{{ $cardItem['components'][0]['format'] }}" name="carousel_templates[{{$cardIndex}}][uploaded_media_file_type]" />
+                            
+                            @if($cardItem['components'][0]['format'] == 'IMAGE')
+                                <div class="form-group col-md-4 col-sm-12">
+                                    <label for="lwHeaderImage{{ $cardIndex }}">{{ __tr('Select Image') }}</label>
+                                    <input id="lwHeaderImage{{ $cardIndex }}" type="file" data-allow-revert="true"
+                                        data-label-idle="{{ __tr('Select Image') }}" class="lw-file-uploader" data-instant-upload="true"
+                                        data-action="<?= route('media.upload_temp_media', 'whatsapp_image') ?>" data-allowed-media='{{ getMediaRestriction('whatsapp_image') }}'
+                                        data-file-input-element="#lwHeaderUpload{{$cardIndex}}"<?= ($pageType == 'bot_reply_form') ? "data-lw-plugin=\"lwUploader\"" : ''; ?>>
+                                    <input id="lwHeaderUpload{{$cardIndex}}" type="hidden" value="" name="carousel_templates[{{$cardIndex}}][uploaded_media_file_name]" required="true"/>
+                                </div>
+                            @endif
+
+                            @if($cardItem['components'][0]['format'] == 'VIDEO')
+                                <div class="form-group col-md-4 col-sm-12">
+                                    <label for="lwHeaderImage{{ $cardIndex}}">{{ __tr('Select Video') }}</label>
+                                    <input id="lwHeaderImage{{ $cardIndex}}" type="file" data-allow-revert="true"
+                                        data-label-idle="{{ __tr('Select Video') }}" class="lw-file-uploader" data-instant-upload="true"
+                                        data-action="<?= route('media.upload_temp_media', 'whatsapp_video') ?>" data-allowed-media='{{ getMediaRestriction('whatsapp_video') }}'
+                                        data-file-input-element="#lwHeaderUpload{{$cardIndex}}" <?= ($pageType == 'bot_reply_form') ? "data-lw-plugin=\"lwUploader\"" : ''; ?>>
+                                    <input id="lwHeaderUpload{{$cardIndex}}" type="hidden" value="" name="carousel_templates[{{$cardIndex}}][uploaded_media_file_name]" required="true"/>
+                                </div>
+                            @endif
+                        @endif
+                                    
+                        @if($cardItem['components'][1]['type'] == 'BODY')
+                            @if(isset($cardItem['components'][1]['example']))
+                                <h3><u>{{ __tr('Body Text') }}</u></h3>
+                                <?php 
+                                    $carouselBodyData = [];
+                                    foreach ($cardItem['components'][1]['example']['body_text'][0] as $bodyTextIndex => $bodyTextExample) {
+                                        $carouselBodyData[] = [
+                                            'id' => 'lwField_'. $cardIndex. '_' .$bodyTextIndex, 
+                                            'label' => 'field_' . $bodyTextIndex + 1,
+                                            'name' => "carousel_templates[$cardIndex][body_example_fields][$bodyTextIndex]"
+                                        ];
+                                    }
+                                ?>
+                                
+                                @include('whatsapp-service.template-partial', [
+                                    'parameters' => $carouselBodyData,
+                                    'subjectType' => 'body',
+                                ])
+                            @endif
+                        @endif
+
+                        @if($cardItem['components'][2]['type'] == 'BUTTONS')
+                            <h3><u>{{ __tr('Buttons') }}</u></h3>
+                            @foreach($cardItem['components'][2]['buttons'] as $buttonIndex => $button)
+                                <input type="hidden" value="{{ $button['type'] }}" name="carousel_templates[{{$cardIndex}}][button_type][{{$buttonIndex}}]">
+                                @if($button['type'] == 'QUICK_REPLY')
+                                    <x-lw.input-field id="lwQuickReplyPayload"
+                                        type="text" 
+                                        data-form-group-class=""
+                                        :label="__tr('Quick Reply Button Payload')"
+                                        name="carousel_templates[{{$cardIndex}}][quick_reply_button_payload]">
+                                    </x-lw.input-field>
+                                @endif
+
+                                @if(isset($button['example']))
+                                    @include('whatsapp-service.template-partial', [
+                                        'parameters' => [
+                                            [
+                                                'id' => 'lwField_'. $cardIndex. '_' .$buttonIndex, 
+                                                'label' => 'field_' . $buttonIndex,
+                                                'name' => "carousel_templates[$cardIndex][button_example_field]"
+                                            ]
+                                        ],
+                                        'subjectType' => 'body',
+                                    ])
+                                @endif
+                            @endforeach
+                        @endif
+                    </fieldset>
+                @endforeach
+            </fieldset>
+        @endif
+
     </div>
     {{-- Message Preview --}}
     <div class="col-sm-12 col-md-8 col-lg-6">
@@ -123,7 +210,8 @@ $onlyTemplatePreview = request()->has('only-preview');
             'bodyComponentText' => $bodyComponentText,
             'parameters' => $bodyParameters,
             'subjectType' => 'body',
-            'templateComponents' => $templateComponents
+            'templateComponents' => $templateComponents,
+            'carouselTemplateData' => $carouselTemplateData
             ])
  </div>
 @if(!$onlyTemplatePreview)

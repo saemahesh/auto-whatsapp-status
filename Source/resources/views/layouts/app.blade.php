@@ -15,7 +15,6 @@ $currentAppTheme ='';
  $currentAppTheme = getUserAppTheme()
 
 @endphp
-
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ $CURRENT_LOCALE_DIRECTION }}">
 
@@ -77,9 +76,9 @@ $currentAppTheme ='';
         @if(isDemo())
         <div class="container">
             <div class="row">
-                <a class="alert alert-danger col-12 mt-md-8 mt-sm-4 mb-sm--3 text-center text-white" target="_blank"
+                <a class="alert alert-danger col-12 mt-md-6 mb-md--6 mt-sm-4 mb-sm--3 text-center text-white" target="_blank"
                     href="https://codecanyon.net/item/whatsjet-saas-a-whatsapp-marketing-platform-with-bulk-sending-campaigns-chat-bots/51167362">
-                    {{ __tr('Please Note: We sell this script only through CodeCanyon.net at ') }}
+                    {{ __tr('Please Note: We sell this script only through CodeCanyon.net at') }}
                     https://codecanyon.net/item/whatsjet-saas-a-whatsapp-marketing-platform-with-bulk-sending-campaigns-chat-bots/51167362
                 </a>
             </div>

@@ -8,8 +8,9 @@ in such case its advisable that DO NOT UPGRADE on existing installation instead 
 1)
     a) Please backup all your files as well as database for precautions.
     b) Clear existing cache etc especially bootstrap/cache all files except .gitignore
+    c) Check change-log.txt for changed files/folders
 
-2) Delete/Replace all the folders & files except below:
+2) Delete/Replace all the folders & files except below OR as per change-log.txt:
     a) .env
     b) public/media-storage
     c) locale - (As you may updated the language translations)

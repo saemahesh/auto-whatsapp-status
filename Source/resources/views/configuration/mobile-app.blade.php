@@ -22,39 +22,39 @@ $demoContent = 'XXXXXXXXXXXXX MASKED FOR DEMO XXXXXXXXXXXXX';
             <div class="alert alert-warning">
                 <strong>{{  __tr('Information masked for demo') }}</strong>
             </div>
-            @else
-            <code class="form-control bg-white  lw-mobile-app " readonly name="mobile_app_config" id="mobileAppConfig" rows="50">
-                        // This is the mobile app configuration file content you can make
-                        // changes to the file as per your requirements
+@else
+<code class="form-control bg-white  lw-mobile-app " readonly name="mobile_app_config" id="mobileAppConfig" rows="100">
+// This is the mobile app configuration file content you can make
+// changes to the file as per your requirements
 
-                        // Warning do not change >>> -------------------------------------------
+// Warning do not change >>> -------------------------------------------
 
-                        const String baseUrl = '{{ url('/') }}/';
-                        const String baseApiUrl = '${baseUrl}api/';
-                        // key for form encryption/decryptions
-                        {{-- -----BEGIN PUBLIC KEY----- --}}
-                        const String publicKey = '''{!! $isDemoMode ? $demoContent : YesSecurity::getPublicRsaKey() !!}''';
-                        {{-- -----END PUBLIC KEY----- --}}
-                        // ------------------------------------------- <<<<< do not change
+const String baseUrl = '{{ url('/') }}/';
+const String baseApiUrl = '${baseUrl}api/';
+// key for form encryption/decryptions
+{{-- -----BEGIN PUBLIC KEY----- --}}
+const String publicKey = '''{!! $isDemoMode ? $demoContent : YesSecurity::getPublicRsaKey() !!}''';
+{{-- -----END PUBLIC KEY----- --}}
+// ------------------------------------------- <<<<< do not change
 
-                        // if you want to enable debug mode set it to true
-                        // for the production make it false
-                        const bool debug = {{ config('app.debug') ? 'true' : 'false' }};
-                        const String version = '1.0.0';
-                        const Map configItems = {
-                            'debug': debug,
-                            'appTitle': '{{ getAppSettings('name') }}',
-                            'services': {
-                                'pusher': {
-                                    'apiKey': '{{ $isDemoMode ? $demoContent : getAppSettings('pusher_app_key') }}',
-                                    'cluster': '{{ $isDemoMode ? $demoContent : getAppSettings('pusher_app_cluster') }}',
-                                }
-                            }
-                        };
-                    </code>
-                @endif
+// if you want to enable debug mode set it to true
+// for the production make it false
+const bool debug = {{ config('app.debug') ? 'true' : 'false' }};
+const String version = '1.0.0';
+const Map configItems = {
+    'debug': debug,
+    'appTitle': '{{ getAppSettings('default_language') }}',
+    'default_language_code': '{{ getAppSettings('default_language') }}',
+    'services': {
+        'pusher': {
+            'apiKey': '{{ $isDemoMode ? $demoContent : getAppSettings('pusher_app_key') }}',
+            'cluster': '{{ $isDemoMode ? $demoContent : getAppSettings('pusher_app_cluster') }}'
+        }
+    }
+};
+</code>
+@endif
         </div>
     </div>
-</div>
 </div>
 @endsection()

@@ -1,4 +1,22 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
  * UserRepository.php - Repository file
@@ -149,6 +167,27 @@ class UserRepository extends AuthRepository implements UserRepositoryInterface
         ]);
         if(!empty($vendorMessagingUserIds)) {
             $vendorUsers = $vendorUsers->merge($this->fetchItAll($vendorMessagingUserIds, null, '_id'));
+        }
+        return $vendorUsers;
+    }
+
+    function fetchTeamMembers() 
+    {
+        $vendorId = getVendorId();
+        $vendorMessagingUserIds = VendorUserModel::where([
+            'vendors__id' => $vendorId
+        ])->get()->pluck('users__id')->toArray();
+        
+        $selectColumn = [
+            '_id', '_uid', 'first_name', 'last_name', 'vendors__id'
+        ];
+        
+        // get all the vendor users
+        $vendorUsers = $this->fetchItAll([
+            'vendors__id' => $vendorId
+        ], $selectColumn);
+        if(!empty($vendorMessagingUserIds)) {
+            $vendorUsers = $vendorUsers->merge($this->fetchItAll($vendorMessagingUserIds, $selectColumn, '_id'));
         }
         return $vendorUsers;
     }

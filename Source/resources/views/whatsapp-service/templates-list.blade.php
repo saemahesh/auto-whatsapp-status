@@ -88,3 +88,9 @@
     </div>
 </div>
 @endsection()
+@push('appScripts')
+<?= __yesset([
+            'dist/js/whatsapp-template.js',
+        ],true,
+) ?>
+@endpush

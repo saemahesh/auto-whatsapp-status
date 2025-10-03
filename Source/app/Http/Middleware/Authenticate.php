@@ -8,6 +8,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authenticate as Middleware;
 use Illuminate\Support\Facades\URL;
 use Session;
+use Illuminate\Support\Arr;
 
 class Authenticate extends Middleware
 {
@@ -42,30 +43,34 @@ class Authenticate extends Middleware
     {
         $this->authenticate($request, $guards);
 
-        $user = Auth::user();
-        // check if user is exists
-        if (__isEmpty($user) or $user->status != 1) {
-            if ($request->ajax()) {
-                return __apiResponse([
-                    'message' => __tr('Your account does not seems to be active'),
-                    'auth_info' => getUserAuthInfo(11),
-                    'redirect_to' => route('auth.login'),
-                ], 21);
+        // Check if Super Admin logged in
+        if (__isEmpty(Arr::get(session('loggedBySuperAdmin'), 'id'))) {
+            $user = Auth::user();
+            // check if user is exists
+            if (__isEmpty($user) or $user->status != 1) {
+                if ($request->ajax()) {
+                    return __apiResponse([
+                        'message' => __tr('Your account does not seems to be active'),
+                        'auth_info' => getUserAuthInfo(11),
+                        'redirect_to' => route('auth.login'),
+                    ], 21);
+                }
+
+                // Check if user is logged in then logout that user
+                if (Auth::check()) {
+                    Auth::logout();
+                }
+
+                Session::put('intendedUrl', URL::current());
+
+                return redirect()->route('auth.login')
+                    ->with([
+                        'error' => true,
+                        'message' => __tr('Your account does not seems to be active'),
+                    ]);
             }
-
-            // Check if user is logged in then logout that user
-            if (Auth::check()) {
-                Auth::logout();
-            }
-
-            Session::put('intendedUrl', URL::current());
-
-            return redirect()->route('auth.login')
-                ->with([
-                    'error' => true,
-                    'message' => __tr('Your account does not seems to be active'),
-                ]);
         }
+        
         // check if demo mode is on
         if (
             $request->isMethod('post')

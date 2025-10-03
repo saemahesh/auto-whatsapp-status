@@ -15,61 +15,61 @@ return [
         'all' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/jpg', 'image/JPG', 'image/jpeg', 'image/JPEG'],
-                'allowedFileExtensions' => ['jpg','png','jpeg'],
+                'allowedFileExtensions' => ['jpg', 'png', 'jpeg'],
             ],
         ],
         'logo' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/png', 'image/PNG', 'image/svg', 'image/svg+xml'],
-                'allowedFileExtensions' => ['png','svg'],
+                'allowedFileExtensions' => ['png', 'svg'],
             ],
         ],
         'small_logo' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/png', 'image/PNG', 'image/svg', 'image/svg+xml'],
-                'allowedFileExtensions' => ['png','svg'],
+                'allowedFileExtensions' => ['png', 'svg'],
             ],
         ],
         'favicon' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/ico', 'image/vnd.microsoft.icon', 'image/png', 'image/PNG'],
-                'allowedFileExtensions' => ['png','ico'],
+                'allowedFileExtensions' => ['png', 'ico'],
             ],
         ],
         'dark_theme_logo' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/png', 'image/PNG', 'image/svg', 'image/svg+xml'],
-                'allowedFileExtensions' => ['png','svg'],
+                'allowedFileExtensions' => ['png', 'svg'],
             ],
         ],
         'dark_theme_small_logo' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/png', 'image/PNG', 'image/svg', 'image/svg+xml'],
-                'allowedFileExtensions' => ['png','svg'],
+                'allowedFileExtensions' => ['png', 'svg'],
             ],
         ],
         'dark_theme_favicon' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/ico', 'image/vnd.microsoft.icon', 'image/png', 'image/PNG'],
-                'allowedFileExtensions' => ['png','ico'],
+                'allowedFileExtensions' => ['png', 'ico'],
             ],
         ],
         'profile' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/jpg', 'image/JPG', 'image/jpeg', 'image/JPEG', 'image/png', 'image/gif', 'image/svg', 'image/svg+xml'],
-                'allowedFileExtensions' => ['jpg','png','jpeg','svg','gif'],
+                'allowedFileExtensions' => ['jpg', 'png', 'jpeg', 'svg', 'gif'],
             ],
         ],
         'cover_image' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/jpg', 'image/JPG', 'image/jpeg', 'image/JPEG', 'image/png'],
-                'allowedFileExtensions' => ['jpg','png','jpeg'],
+                'allowedFileExtensions' => ['jpg', 'png', 'jpeg'],
             ],
         ],
         'photos' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/jpg', 'image/JPG', 'image/jpeg', 'image/JPEG', 'image/png', 'image/gif', 'image/svg', 'image/svg+xml'],
-                'allowedFileExtensions' => ['jpg','png','jpeg','svg','gif'],
+                'allowedFileExtensions' => ['jpg', 'png', 'jpeg', 'svg', 'gif'],
             ],
         ],
         'language' => [
@@ -81,7 +81,7 @@ return [
         'whatsapp_image' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/jpeg', 'image/png'],
-                'allowedFileExtensions' => ['jpg','png','jpeg'],
+                'allowedFileExtensions' => ['jpg', 'png', 'jpeg'],
             ],
         ],
         'whatsapp_sticker' => [
@@ -92,8 +92,11 @@ return [
         ],
         'whatsapp_video' => [
             'restrictions' => [
-                'allowedFileTypes' => ['video/mp4', 'video/3gp'],
-                'allowedFileExtensions' => ['mp4','3gp'],
+                'allowedFileTypes' => [
+                    'video/mp4',
+                    'video/3gp'
+                ],
+                'allowedFileExtensions' => ['mp4', '3gp'],
             ],
         ],
         'whatsapp_audio' => [
@@ -105,45 +108,62 @@ return [
                     'audio/amr',
                     'audio/ogg',
                 ],
-                'allowedFileExtensions' => ['aac','m4a', 'mp4', 'mp3','mpga', 'amr', 'ogg', 'oga'],
+                'allowedFileExtensions' => ['aac', 'm4a', 'mp4', 'mp3', 'mpga', 'amr', 'ogg', 'oga'],
             ],
         ],
         'whatsapp_document' => [
             'restrictions' => [
                 'allowedFileTypes' => [
-                    'text/plain', 'application/pdf',
+                    'text/plain',
+                    'text/xml',
                     'application/vnd.ms-powerpoint',
                     'application/msword',
                     'application/vnd.ms-excel',
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    // pdf specific types
+                    'application/pdf',               // Standard PDF
+                    'application/x-pdf',             // Older alias
+                    'application/acrobat',           // Adobe-specific
+                    'applications/vnd.pdf',          // Vendor-specific
+                    'text/pdf',                      // Misclassified occasionally
+                    'text/x-pdf',                    // Also seen in misconfigured servers
                 ],
-                'allowedFileExtensions' => ['txt','pdf', 'ppt', 'pps','doc', 'xls', 'docx', 'xlsx', 'pptx'],
+                'allowedFileExtensions' => ['txt', 'pdf', 'ppt', 'pps', 'doc', 'xls', 'docx', 'xlsx', 'pptx', 'xml'],
             ],
         ],
         'vendor_logo' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/png', 'image/PNG', 'image/svg', 'image/svg+xml'],
-                'allowedFileExtensions' => ['png','svg'],
+                'allowedFileExtensions' => ['png', 'svg'],
             ],
         ],
         'vendor_favicon' => [
             'restrictions' => [
                 'allowedFileTypes' => ['image/ico', 'image/vnd.microsoft.icon', 'image/png', 'image/PNG'],
-                'allowedFileExtensions' => ['png','ico'],
+                'allowedFileExtensions' => ['png', 'ico'],
             ],
         ],
         'vendor_contact_import' => [
             'restrictions' => [
-                'allowedFileTypes' => ['image/xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-                'allowedFileExtensions' => ['xlsx'],
+                'allowedFileTypes' => [
+                    'text/csv', // 🔹 Standard MIME type for CSV files.
+                    'text/csv',                 // ✅ Official standard MIME type for CSV files.
+                    'text/plain',               // ✅ Common fallback MIME type for plain text (many CSVs are uploaded as text/plain).
+                    'application/csv',          // ⚠️ Non-standard, but used by some older tools and servers.
+                    'text/x-csv',               // ⚠️ Used by some browsers or systems (not officially standardized).
+                    'application/x-csv',        // ⚠️ Similar to above — non-standard but appears in the wild.
+                    'text/comma-separated-values', // ⚠️ Descriptive variant, sometimes used by older systems.
+                    'inode/x-empty',            // ⚠️ Indicates a 0-byte (empty) file — may still be a .csv file with no data.
+                    'application/vnd.ms-excel', // ✅ Needed for Firefox on Windows
+                ],
+                'allowedFileExtensions' => ['csv'],
             ],
         ],
         'addon_upload_file' => [
             'restrictions' => [
-                'allowedFileTypes' => ['application/zip'],
-                'allowedFileExtensions' => ['zip'],
+                'allowedFileTypes' => ['zip', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream', 'application/x-zip'],
             ],
         ],
     ],
@@ -153,7 +173,7 @@ return [
     'storage_paths' => [
         'temp' => 'key@language_file', // it will be in local storage
         'internal_temp' => 'key@internal_temp', // it will be in local storage
-        env('STORAGE_BASE_FOLDER', '').'media-storage' => [
+        env('STORAGE_BASE_FOLDER', '') . 'media-storage' => [
             'users-temp-uploads' => [
                 '{_uid}' => [
                     'temp_uploads' => 'key@user_temp_uploads',

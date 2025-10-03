@@ -12,261 +12,274 @@
 </div>
 @endif
 <hr>
-        <!-- stripe settings -->
-        <fieldset class="lw-fieldset mb-3" x-data="{panelOpened:false}" x-cloak>
-            <legend @click="panelOpened = !panelOpened" class="lw-fieldset-legend">
-                <i class="fab fa-stripe"></i> <?= __tr('Stripe Gateway for Subscription (Recurring - Auto Debit)') ?>
-                <small class="text-muted">{{  __tr('Click to expand/collapse') }}</small>
+        <fieldset class="lw-fieldset mb-3" x-cloak>
+            <legend class="lw-fieldset-legend">
+                <i class="fab fa-stripe"></i> <?= __tr('Gateway for Subscription (Recurring - Auto Debit)') ?>
             </legend>
-            <!-- Payment Setting Form -->
-            <form x-show="panelOpened" class="lw-ajax-form lw-form" method="post" data-callback="onPaymentGatewayFormCallback"
-                action="<?= route('manage.configuration.write', ['pageType' => request()->pageType]) ?>">
-                <!-- input field body -->
-                <div class="form-group mt-2">
+            <!-- stripe settings -->
+            <fieldset class="lw-fieldset mb-3" x-data="{panelOpened:false}" x-cloak>
+                <legend @click="panelOpened = !panelOpened" class="lw-fieldset-legend">
+                    <i class="fab fa-stripe"></i> <?= __tr('Stripe Gateway') ?>
+                    <small class="text-muted">{{  __tr('Click to expand/collapse') }}</small>
+                </legend>
+                <!-- Payment Setting Form -->
+                <form x-show="panelOpened" class="lw-ajax-form lw-form" method="post" data-callback="onPaymentGatewayFormCallback"
+                    action="<?= route('manage.configuration.write', ['pageType' => request()->pageType]) ?>">
+                    <!-- input field body -->
+                    <div class="form-group mt-2">
 
-                    <!-- Enable stripe Checkout field -->
-                    <div class="form-group pt-3">
-                        <label for="lwEnableStripe">
-                            <input type="hidden" name="enable_stripe" value="0">
-                            <input type="checkbox" id="lwEnableStripe" data-lw-plugin="lwSwitchery" name="enable_stripe"
-                                <?=$configurationData['enable_stripe']==true ? 'checked' : '' ?>>
-                            <?= __tr('Enable Stripe Subscription Checkout') ?>
-                        </label>
-                    </div>
-                    <!-- / Enable stripe Checkout field -->
-                    <span id="lwStripeCheckoutContainer">
-                        <div class="p-2 border rounded">
-                            <h3>{{  __tr('Options') }}</h3>
-                            <span class="mr-4">
-                                <x-lw.checkbox id="lwEnableCalculateTaxes" data-size="small" data-color="orange" name="stripe_enable_calculate_taxes" :offValue="0" :checked="getAppSettings('stripe_enable_calculate_taxes')" data-lw-plugin="lwSwitchery" :label="__tr('Calculate Taxes by Stripe')" />
-                            </span>
-                            <x-lw.checkbox id="lwEnableInvoices" data-size="small" data-color="orange" name="stripe_enable_invoice_list" :offValue="0" :checked="getAppSettings('stripe_enable_invoice_list')" data-lw-plugin="lwSwitchery" :label="__tr('Enable Stripe Invoices List Table')" />
-                        </div>
-                        <!-- use testing stripe checkout input fieldset -->
-                        <fieldset class="lw-fieldset mb-3">
-                            <!-- use testing input radio field -->
-                            <legend class="lw-fieldset-legend">
-                                <div class="custom-control custom-radio custom-control-inline">
-                                    <input type="radio" id="lwUseStripeCheckoutTest" name="use_test_stripe"
-                                        class="custom-control-input" value="1" <?=$configurationData['use_test_stripe']==true
-                                        ? 'checked' : '' ?>>
-                                    <label class="custom-control-label" for="lwUseStripeCheckoutTest">
-                                        <?= __tr('Use Testing') ?>
-                                    </label>
-                                </div>
-                    </legend>
-                    <!-- /use testing input radio field -->
-
-                    <!-- show after added testing stipe checkout information -->
-                    <div class="btn-group" id="lwTestStripeCheckoutExists">
-                        <button type="button" disabled="true" class="btn btn-success lw-btn">
-                            <?= __tr('Testing Stripe Checkout keys are installed.') ?>
-                        </button>
-                        <button type="button" class="btn btn-light lw-btn" id="lwUpdateTestStripeCheckout">
-                            <?= __tr('Update') ?>
-                        </button>
-                    </div>
-                    <!-- show after added testing stipe checkout information -->
-
-                    <!-- stripe test secret key exists hidden field -->
-                    <input type="hidden" name="stripe_test_keys_exist" id="lwStripeTestKeysExist"
-                        value="<?= $configurationData['stripe_testing_secret_key'] ?>" />
-                    <!-- stripe test secret key exists hidden field -->
-
-                    <div id="lwTestStripeInputField">
-                        <!-- Testing Secret Key Key -->
-                        <div class="mb-3">
-                            <label for="lwStripeTestSecretKey">
-                                <?= __tr('Secret Key') ?>
-                            </label>
-                            <input type="text" class="form-control form-control-user" value=""
-                                id="lwStripeTestSecretKey" name="stripe_testing_secret_key"
-                                placeholder="<?= __tr('Secret Key') ?>">
-                        </div>
-                        <!-- / Testing Secret Key Key -->
-
-                        <!-- Testing Publish Key -->
-                        <div class="mb-3">
-                            <label for="lwStripeTestPublishKey">
-                                <?= __tr('Publish Key') ?>
-                            </label>
-                            <input type="text" class="form-control form-control-user" value=""
-                                id="lwStripeTestPublishKey" name="stripe_testing_publishable_key"
-                                placeholder="<?= __tr('Publish Key') ?>">
-                        </div>
-                        <!-- / Testing Publish Key -->
-
-                        <!-- Stripe Webhook Secret (optional) -->
-                        <div class="mb-3">
-                            <label for="lwStripeTestWebhookSecret">
-                                <?= __tr('Stripe Webhook Secret (optional)') ?>
-                            </label>
-                            <input type="text" class="form-control form-control-user" value=""
-                                id="lwStripeTestWebhookSecret" name="stripe_testing_webhook_secret"
-                                placeholder="<?= __tr('Stripe Webhook Secret (optional)') ?>">
-                        </div>
-                        <!-- / Stripe Webhook Secret (optional) -->
-                    </div>
-                </fieldset>
-                <!-- /use testing paypal checkout input fieldset -->
-
-                <!-- use live stripe checkout input fieldset -->
-                <fieldset class="lw-fieldset mb-3">
-                    <!-- use live input radio field -->
-                    <legend class="lw-fieldset-legend">
-                        <div class="custom-control custom-radio custom-control-inline">
-                            <input type="radio" id="lwUseStripeCheckoutLive" name="use_test_stripe"
-                                class="custom-control-input" value="0" <?=$configurationData['use_test_stripe']==false
-                                ? 'checked' : '' ?>>
-                            <label class="custom-control-label" for="lwUseStripeCheckoutLive">
-                                <?= __tr('Use Live') ?>
+                        <!-- Enable stripe Checkout field -->
+                        <div class="form-group pt-3">
+                            <label for="lwEnableStripe">
+                                <input type="hidden" name="enable_stripe" value="0">
+                                <input type="checkbox" id="lwEnableStripe" data-lw-plugin="lwSwitchery" name="enable_stripe"
+                                    <?=$configurationData['enable_stripe']==true ? 'checked' : '' ?>>
+                                <?= __tr('Enable Stripe Subscription Checkout') ?>
                             </label>
                         </div>
-                    </legend>
-                    <!-- /use live input radio field -->
-                    @if($isExtendedLicence)
-                    <!-- show after added Live stripe checkout information -->
-                    <div class="btn-group" id="lwLiveStripeCheckoutExists">
-                        <button type="button" disabled="true" class="btn btn-success lw-btn">
-                            <?= __tr('Live Stripe Checkout keys are installed.') ?>
-                        </button>
-                        <button type="button" class="btn btn-light lw-btn" id="lwUpdateLiveStripeCheckout">
-                            <?= __tr('Update') ?>
-                        </button>
-                    </div>
-                    <!-- show after added Live stripe checkout information -->
-
-                    <!-- stripe live secret key exists hidden field -->
-                    <input type="hidden" name="stripe_live_keys_exist" id="lwStripeLiveKeysExist"
-                        value="<?= $configurationData['stripe_live_secret_key'] ?>" />
-                    <!-- stripe live secret key exists hidden field -->
-
-                    <div id="lwLiveStripeInputField">
-                        <div class="alert border-danger text-danger">
-                            {{  __tr('While going live you may need to clear your existing subscription. It only may required if you are switching from test mode.') }}
-                           <div>
-                            <a class="btn btn-danger btn-sm lw-ajax-link-action mt-4" data-show-processing="true" data-method="post" data-confirm="{{ __tr('Are you sure? You want to delete all the subscriptions entries.') }}" href="{{ route('central.subscription.write.delete_all_entries') }}"> <i class="fa fa-cog"></i> {{  __tr('Delete existing subscription entries') }}</a>
-                           </div>
-                        </div>
-                        <!-- Live Secret Key Key -->
-                        <div class="mb-3">
-                            <label for="lwStripeLiveSecretKey">
-                                <?= __tr('Secret Key') ?>
-                            </label>
-                            <input type="text" class="form-control form-control-user" value=""
-                                id="lwStripeLiveSecretKey" name="stripe_live_secret_key"
-                                placeholder="<?= __tr('Secret Key') ?>">
-                        </div>
-                        <!-- / Live Secret Key Key -->
-
-                        <!-- Live Publish Key -->
-                        <div class="mb-3">
-                            <label for="lwStripeLivePublishKey">
-                                <?= __tr('Publish Key') ?>
-                            </label>
-                            <input type="text" class="form-control form-control-user" value=""
-                                id="lwStripeLivePublishKey" name="stripe_live_publishable_key"
-                                placeholder="<?= __tr('Publish Key') ?>">
-                        </div>
-                        <!-- / Live Publish Key -->
-
-                        <!-- Live Stripe Webhook Secret (optional) -->
-                        <div class="mb-3">
-                            <label for="lwStripeLiveWebhookSecret">
-                                <?= __tr('Stripe Webhook Secret (optional)') ?>
-                            </label>
-                            <input type="text" class="form-control form-control-user" value=""
-                                id="lwStripeLiveWebhookSecret" name="stripe_live_webhook_secret"
-                                placeholder="<?= __tr('Stripe Webhook Secret (optional)') ?>">
-                        </div>
-                        <!-- / Live Stripe Webhook Secret (optional) -->
-                    </div>
-                    @else
-					<div class="alert alert-danger">
-						{{  __tr('Extended licence required to use live keys') }}
-					</div>
-					@endif
-                </fieldset>
-                <!-- /use live stripe checkout input fieldset -->
-                <div class="form-group">
-                        <!-- Update Button -->
-                <a href class="lw-ajax-form-submit-action btn btn-primary btn-user lw-btn-block-mobile">
-                    <?= __tr('Save') ?>
-                </a>
-                <!-- /Update Button -->
-                </div>
-                <fieldset>
-                    <legend>{{  __tr('Auto Stripe Webhook Creation (Recommended)') }}</legend>
-                    <div>
-                        @if(!config('cashier.secret'))
-                            <div class="alert alert-dark">
-                                {{  __tr('Stripe keys should be present to create webhook automatically.') }}
+                        <!-- / Enable stripe Checkout field -->
+                        <span id="lwStripeCheckoutContainer">
+                            <div class="p-2 border rounded">
+                                <h3>{{  __tr('Options') }}</h3>
+                                <span class="mr-4">
+                                    <x-lw.checkbox id="lwEnableCalculateTaxes" data-size="small" data-color="orange" name="stripe_enable_calculate_taxes" :offValue="0" :checked="getAppSettings('stripe_enable_calculate_taxes')" data-lw-plugin="lwSwitchery" :label="__tr('Calculate Taxes by Stripe')" />
+                                </span>
+                                <x-lw.checkbox id="lwEnableInvoices" data-size="small" data-color="orange" name="stripe_enable_invoice_list" :offValue="0" :checked="getAppSettings('stripe_enable_invoice_list')" data-lw-plugin="lwSwitchery" :label="__tr('Enable Stripe Invoices List Table')" />
                             </div>
+                            <!-- use testing stripe checkout input fieldset -->
+                            <fieldset class="lw-fieldset mb-3">
+                                <!-- use testing input radio field -->
+                                <legend class="lw-fieldset-legend">
+                                    <div class="custom-control custom-radio custom-control-inline">
+                                        <input type="radio" id="lwUseStripeCheckoutTest" name="use_test_stripe"
+                                            class="custom-control-input" value="1" <?=$configurationData['use_test_stripe']==true
+                                            ? 'checked' : '' ?>>
+                                        <label class="custom-control-label" for="lwUseStripeCheckoutTest">
+                                            <?= __tr('Use Testing') ?>
+                                        </label>
+                                    </div>
+                        </legend>
+                        <!-- /use testing input radio field -->
+
+                        <!-- show after added testing stipe checkout information -->
+                        <div class="btn-group" id="lwTestStripeCheckoutExists">
+                            <button type="button" disabled="true" class="btn btn-success lw-btn">
+                                <?= __tr('Testing Stripe Checkout keys are installed.') ?>
+                            </button>
+                            <button type="button" class="btn btn-light lw-btn" id="lwUpdateTestStripeCheckout">
+                                <?= __tr('Update') ?>
+                            </button>
+                        </div>
+                        <!-- show after added testing stipe checkout information -->
+
+                        <!-- stripe test secret key exists hidden field -->
+                        <input type="hidden" name="stripe_test_keys_exist" id="lwStripeTestKeysExist"
+                            value="<?= $configurationData['stripe_testing_secret_key'] ?>" />
+                        <!-- stripe test secret key exists hidden field -->
+
+                        <div id="lwTestStripeInputField">
+                            <!-- Testing Secret Key Key -->
+                            <div class="mb-3">
+                                <label for="lwStripeTestSecretKey">
+                                    <?= __tr('Secret Key') ?>
+                                </label>
+                                <input type="text" class="form-control form-control-user" value=""
+                                    id="lwStripeTestSecretKey" name="stripe_testing_secret_key"
+                                    placeholder="<?= __tr('Secret Key') ?>">
+                            </div>
+                            <!-- / Testing Secret Key Key -->
+
+                            <!-- Testing Publish Key -->
+                            <div class="mb-3">
+                                <label for="lwStripeTestPublishKey">
+                                    <?= __tr('Publish Key') ?>
+                                </label>
+                                <input type="text" class="form-control form-control-user" value=""
+                                    id="lwStripeTestPublishKey" name="stripe_testing_publishable_key"
+                                    placeholder="<?= __tr('Publish Key') ?>">
+                            </div>
+                            <!-- / Testing Publish Key -->
+
+                            <!-- Stripe Webhook Secret (optional) -->
+                            <div class="mb-3">
+                                <label for="lwStripeTestWebhookSecret">
+                                    <?= __tr('Stripe Webhook Secret (optional)') ?>
+                                </label>
+                                <input type="text" class="form-control form-control-user" value=""
+                                    id="lwStripeTestWebhookSecret" name="stripe_testing_webhook_secret"
+                                    placeholder="<?= __tr('Stripe Webhook Secret (optional)') ?>">
+                            </div>
+                            <!-- / Stripe Webhook Secret (optional) -->
+                        </div>
+                    </fieldset>
+                    <!-- /use testing paypal checkout input fieldset -->
+
+                    <!-- use live stripe checkout input fieldset -->
+                    <fieldset class="lw-fieldset mb-3">
+                        <!-- use live input radio field -->
+                        <legend class="lw-fieldset-legend">
+                            <div class="custom-control custom-radio custom-control-inline">
+                                <input type="radio" id="lwUseStripeCheckoutLive" name="use_test_stripe"
+                                    class="custom-control-input" value="0" <?=$configurationData['use_test_stripe']==false
+                                    ? 'checked' : '' ?>>
+                                <label class="custom-control-label" for="lwUseStripeCheckoutLive">
+                                    <?= __tr('Use Live') ?>
+                                </label>
+                            </div>
+                        </legend>
+                        <!-- /use live input radio field -->
+                        @if($isExtendedLicence)
+                        <!-- show after added Live stripe checkout information -->
+                        <div class="btn-group" id="lwLiveStripeCheckoutExists">
+                            <button type="button" disabled="true" class="btn btn-success lw-btn">
+                                <?= __tr('Live Stripe Checkout keys are installed.') ?>
+                            </button>
+                            <button type="button" class="btn btn-light lw-btn" id="lwUpdateLiveStripeCheckout">
+                                <?= __tr('Update') ?>
+                            </button>
+                        </div>
+                        <!-- show after added Live stripe checkout information -->
+
+                        <!-- stripe live secret key exists hidden field -->
+                        <input type="hidden" name="stripe_live_keys_exist" id="lwStripeLiveKeysExist"
+                            value="<?= $configurationData['stripe_live_secret_key'] ?>" />
+                        <!-- stripe live secret key exists hidden field -->
+
+                        <div id="lwLiveStripeInputField">
+                            <div class="alert border-danger text-danger">
+                                {{  __tr('While going live you may need to clear your existing subscription. It only may required if you are switching from test mode.') }}
+                            <div>
+                                <a class="btn btn-danger btn-sm lw-ajax-link-action mt-4" data-show-processing="true" data-method="post" data-confirm="{{ __tr('Are you sure? You want to delete all the subscriptions entries.') }}" href="{{ route('central.subscription.write.delete_all_entries') }}"> <i class="fa fa-cog"></i> {{  __tr('Delete existing subscription entries') }}</a>
+                            </div>
+                            </div>
+                            <!-- Live Secret Key Key -->
+                            <div class="mb-3">
+                                <label for="lwStripeLiveSecretKey">
+                                    <?= __tr('Secret Key') ?>
+                                </label>
+                                <input type="text" class="form-control form-control-user" value=""
+                                    id="lwStripeLiveSecretKey" name="stripe_live_secret_key"
+                                    placeholder="<?= __tr('Secret Key') ?>">
+                            </div>
+                            <!-- / Live Secret Key Key -->
+
+                            <!-- Live Publish Key -->
+                            <div class="mb-3">
+                                <label for="lwStripeLivePublishKey">
+                                    <?= __tr('Publish Key') ?>
+                                </label>
+                                <input type="text" class="form-control form-control-user" value=""
+                                    id="lwStripeLivePublishKey" name="stripe_live_publishable_key"
+                                    placeholder="<?= __tr('Publish Key') ?>">
+                            </div>
+                            <!-- / Live Publish Key -->
+
+                            <!-- Live Stripe Webhook Secret (optional) -->
+                            <div class="mb-3">
+                                <label for="lwStripeLiveWebhookSecret">
+                                    <?= __tr('Stripe Webhook Secret (optional)') ?>
+                                </label>
+                                <input type="text" class="form-control form-control-user" value=""
+                                    id="lwStripeLiveWebhookSecret" name="stripe_live_webhook_secret"
+                                    placeholder="<?= __tr('Stripe Webhook Secret (optional)') ?>">
+                            </div>
+                            <!-- / Live Stripe Webhook Secret (optional) -->
+                        </div>
+                        @else
+                        <div class="alert alert-danger">
+                            {{  __tr('Extended licence required to use live keys') }}
+                        </div>
                         @endif
-                        <div class="alert border-success text-success">
-                            {{  __tr('Clicking on this button will create webhook in your stripe account with all required events.') }}
-                        <div class="mt-4">
-                            <a class="btn btn-success lw-ajax-link-action @if(!config('cashier.secret')) disabled @endif" data-show-processing="true" data-method="post" data-confirm="{{ __tr('Are you sure? It will call Stripe API to create webhook with events and will store it\'s secret into the system.') }}" href="{{ route('manage.configuration.create_stripe_webhook') }}"> <i class="fa fa-cog"></i> {{  __tr('Create Stripe Webhook Automatically') }}</a>
-                        </div>
-                        </div>
-                        @php
-                            $testWebHookCreated = getAppSettings('payment_gateway_info', 'auto_stripe_webhook_info.testing.created_at');
-                            $liveWebHookCreated = getAppSettings('payment_gateway_info', 'auto_stripe_webhook_info.live.created_at');
-                        @endphp
-                        <div x-cloak x-data="{lastTestWebhookCreatedAt:'{{ $testWebHookCreated ? formatDateTime($testWebHookCreated) : '' }}',lastLiveWebhookCreatedAt:'{{ $liveWebHookCreated ? formatDateTime($liveWebHookCreated) : '' }}'}" class="my-3">
-                            <div x-show="lastTestWebhookCreatedAt">
-                                {!! __tr('Last Test Webhook created at __createdAt__', [
-                                '__createdAt__' => '<span x-text="lastTestWebhookCreatedAt"></span>'
-                            ]) !!}
-                            </div>
-                            <div x-show="lastLiveWebhookCreatedAt">
-                                {!! __tr('Last Live Webhook created at __createdAt__', [
-                                '__createdAt__' => '<span x-text="lastLiveWebhookCreatedAt"></span>'
-                            ]) !!}
-                            </div>
-                        </div>
-                    </div>
-                </fieldset>
-                <h2 class="col-12 text-center text-muted my-4">{{  __tr('-- OR --') }}</h2>
-                <fieldset>
-                    <legend>{{  __tr('Manual Stripe Webhook Creation') }}</legend>
+                    </fieldset>
+                    <!-- /use live stripe checkout input fieldset -->
                     <div class="form-group">
-                        <label for="lwStripeWebhookUrl">{{ __tr('Stripe Webhook') }}</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" readonly id="lwStripeWebhookUrl" value="{{ getViaSharedUrl(route('cashier.webhook')) }}">
-                            <div class="input-group-append">
-                                <button class="btn btn-outline-light" type="button" onclick="lwCopyToClipboard('lwStripeWebhookUrl')">
-                                    <?= __tr('Copy') ?>
-                                </button>
+                            <!-- Update Button -->
+                    <a href class="lw-ajax-form-submit-action btn btn-primary btn-user lw-btn-block-mobile">
+                        <?= __tr('Save') ?>
+                    </a>
+                    <!-- /Update Button -->
+                    </div>
+                    <fieldset>
+                        <legend>{{  __tr('Auto Stripe Webhook Creation (Recommended)') }}</legend>
+                        <div>
+                            @if(!config('cashier.secret'))
+                                <div class="alert alert-dark">
+                                    {{  __tr('Stripe keys should be present to create webhook automatically.') }}
+                                </div>
+                            @endif
+                            <div class="alert border-success text-success">
+                                {{  __tr('Clicking on this button will create webhook in your stripe account with all required events.') }}
+                            <div class="mt-4">
+                                <a class="btn btn-success lw-ajax-link-action @if(!config('cashier.secret')) disabled @endif" data-show-processing="true" data-method="post" data-confirm="{{ __tr('Are you sure? It will call Stripe API to create webhook with events and will store it\'s secret into the system.') }}" href="{{ route('manage.configuration.create_stripe_webhook') }}"> <i class="fa fa-cog"></i> {{  __tr('Create Stripe Webhook Automatically') }}</a>
+                            </div>
+                            </div>
+                            @php
+                                $testWebHookCreated = getAppSettings('payment_gateway_info', 'auto_stripe_webhook_info.testing.created_at');
+                                $liveWebHookCreated = getAppSettings('payment_gateway_info', 'auto_stripe_webhook_info.live.created_at');
+                            @endphp
+                            <div x-cloak x-data="{lastTestWebhookCreatedAt:'{{ $testWebHookCreated ? formatDateTime($testWebHookCreated) : '' }}',lastLiveWebhookCreatedAt:'{{ $liveWebHookCreated ? formatDateTime($liveWebHookCreated) : '' }}'}" class="my-3">
+                                <div x-show="lastTestWebhookCreatedAt">
+                                    {!! __tr('Last Test Webhook created at __createdAt__', [
+                                    '__createdAt__' => '<span x-text="lastTestWebhookCreatedAt"></span>'
+                                ]) !!}
+                                </div>
+                                <div x-show="lastLiveWebhookCreatedAt">
+                                    {!! __tr('Last Live Webhook created at __createdAt__', [
+                                    '__createdAt__' => '<span x-text="lastLiveWebhookCreatedAt"></span>'
+                                ]) !!}
+                                </div>
                             </div>
                         </div>
-                        <div class="alert alert-light my-3">
-                            <h3>{{  __tr('Select following events whiles creating webhook') }}</h3>
-                            <p>customer.subscription.created, customer.subscription.updated, customer.subscription.deleted, customer.updated, customer.deleted, payment_method.automatically_updated, invoice.payment_action_required, invoice.payment_succeeded</p>
+                    </fieldset>
+                    <h2 class="col-12 text-center text-muted my-4">{{  __tr('-- OR --') }}</h2>
+                    <fieldset>
+                        <legend>{{  __tr('Manual Stripe Webhook Creation') }}</legend>
+                        <div class="form-group">
+                            <label for="lwStripeWebhookUrl">{{ __tr('Stripe Webhook') }}</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" readonly id="lwStripeWebhookUrl" value="{{ getViaSharedUrl(route('cashier.webhook')) }}">
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-light" type="button" onclick="lwCopyToClipboard('lwStripeWebhookUrl')">
+                                        <?= __tr('Copy') ?>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="alert alert-light my-3">
+                                <h3>{{  __tr('Select following events whiles creating webhook') }}</h3>
+                                <p>{{  __tr('customer.subscription.created, customer.subscription.updated, customer.subscription.deleted, customer.updated, customer.deleted, payment_method.automatically_updated, invoice.payment_action_required, invoice.payment_succeeded') }}</p>
+                            </div>
+                            <div class="text-danger help-text mt-2 text-sm">{{  __tr('IMPORTANT: It is very important that you should add this Webhook to Stripe account, as all the payment information gets updated using this webhook.') }}</div>
                         </div>
-                        <div class="text-danger help-text mt-2 text-sm">{{  __tr('IMPORTANT: It is very important that you should add this Webhook to Stripe account, as all the payment information gets updated using this webhook.') }}</div>
-                    </div>
+                    </fieldset>
+                    <!-- / stripe settings -->
+                <fieldset>
+                    <legend>{{  __tr('Note') }}</legend>
+                    {{  __tr('Please make sure you have enabled billing portal link in your Stripe account') }}
+                    <a target="_blank" href="https://dashboard.stripe.com/settings/billing/portal">https://dashboard.stripe.com/settings/billing/portal</a>
                 </fieldset>
-                 <!-- / stripe settings -->
-            <fieldset>
-                <legend>{{  __tr('Note') }}</legend>
-                {{  __tr('Please make sure you have enabled billing portal link in your Stripe account') }}
-                <a target="_blank" href="https://dashboard.stripe.com/settings/billing/portal">https://dashboard.stripe.com/settings/billing/portal</a>
-            </fieldset>
-            </span>
-            <hr class="my-4">
-            <div class="form-group">
-                        <!-- Update Button -->
-                <a href class="lw-ajax-form-submit-action btn btn-primary btn-user lw-btn-block-mobile">
-                    <?= __tr('Save') ?>
-                </a>
-                <!-- /Update Button -->
+                </span>
+                <hr class="my-4">
+                <div class="form-group">
+                            <!-- Update Button -->
+                    <a href class="lw-ajax-form-submit-action btn btn-primary btn-user lw-btn-block-mobile">
+                        <?= __tr('Save') ?>
+                    </a>
+                    <!-- /Update Button -->
+                    </div>
                 </div>
-            </div>
-            <!-- / input field body -->
-            </form>
+                <!-- / input field body -->
+                </form>
+            </fieldset>
+            <!-- /Payment Setting Form -->
+
+            <!-- For Recurring Payment Only -->
+            @stack('autoSubscriptionSettingStack')
+            <!-- /For Recurring Payment Only -->
         </fieldset>
-        <!-- /Payment Setting Form -->
+
+        <!-- For one time Payment Only -->
+        @stack('oneTimeGatewaySettingStackStart')
+        <!-- /For one time Payment Only -->
 
         <!-- Paypal checkout start -->
           <fieldset class="lw-fieldset mb-3" x-data="{panelOpened:false}" x-cloak>
@@ -290,7 +303,7 @@
                         </label>
                     </div>
                     <div>
-                        <p class="mt-3 ml-3">You can create PayPal credential <a href="https://www.paypal.com/signin?returnUri=https%3A%2F%2Fdeveloper.paypal.com%2Fdeveloper%2Fapplications&intent=developer" target="_blank">click here</a>.</p>
+                        <p class="mt-3 ml-3"><?= __tr('You can create PayPal credential') ?><a href="https://www.paypal.com/signin?returnUri=https%3A%2F%2Fdeveloper.paypal.com%2Fdeveloper%2Fapplications&intent=developer" target="_blank">{{  __tr('click here') }}</a></p>
 
                      </div>
                     <!-- / Enable Paypal Checkout field -->
@@ -461,7 +474,7 @@
                     </div>
                     {{-- /webhook URL --}}
                     <div>
-                        <p class="mt-3 ml-3">You can create Razorpay credential <a href="https://dashboard.razorpay.com/" target="_blank">click here</a>.</p>
+                        <p class="mt-3 ml-3"><?= __tr('You can create Razorpay credential') ?><a href="https://dashboard.razorpay.com/" target="_blank">{{  __tr('click here') }}</a>.</p>
 
                     </div>
                     <!-- / Enable razorpay Checkout field -->
@@ -848,7 +861,7 @@
             </div>
             {{-- /callback URL --}}
             <div>
-                <p class="mt-3 ml-3">You can create Paystack credential <a href="https://dashboard.paystack.com/" target="_blank">click here</a>.</p>
+                <p class="mt-3 ml-3"><?= __tr('You can create Paystack credential') ?><a href="https://dashboard.paystack.com/" target="_blank">{{  __tr('click here') }}</a>.</p>
 
              </div>
             <hr class="my-4">
@@ -902,7 +915,7 @@
                     </div>
                     {{-- /webhook URL --}}
                     <div>
-                        <p class="mt-3 ml-3">You can create YooMoney credential <a href="https://yookassa.ru/developers/payment-acceptance/getting-started/quick-start?lang=en" target="_blank">click here</a>.</p>
+                        <p class="mt-3 ml-3"><?= __tr('You can create YooMoney credential') ?><a href="https://yookassa.ru/developers/payment-acceptance/getting-started/quick-start?lang=en" target="_blank">{{  __tr('click here') }}</a></p>
 
                     </div>
                     <!-- / Enable YooMoney Checkout field -->
@@ -1044,6 +1057,10 @@
             </form>
         </fieldset>
         <!-- /yoomoney end -->
+
+        <!-- For one time Payment Only -->
+        @stack('oneTimeGatewaySettingStackEnd')
+        <!-- /For one time Payment Only -->
 @push('appScripts')
 <script>
         (function($) {

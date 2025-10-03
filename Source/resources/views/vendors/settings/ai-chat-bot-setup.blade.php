@@ -119,6 +119,10 @@
                             <!-- set hidden input field with form type -->
                             <input type="hidden" name="form_type" value="ai_bot_setup_page" />
                             <x-lw.checkbox id="enableOpenAiBot" name="enable_open_ai_bot" :checked="getVendorSettings('enable_open_ai_bot')" data-lw-plugin="lwSwitchery" :label="__tr('Enable OpenAI Chat Bot')" />
+                            <div class="alert alert-warning my-4">
+                                {{  __tr('Note - Enabling it will send chat history to OpenAI, it may increase the OpenAI API cost.') }}
+                            </div>
+                            <x-lw.checkbox id="useExistingChatHistory" name="use_existing_chat_history" :checked="getVendorSettings('use_existing_chat_history')" data-lw-plugin="lwSwitchery" :label="__tr('Use existing chat history as context')" />                            
                             <x-lw.input-field placeholder="{{ __tr('Your AI Bot Name') }}"
                             type="text" id="lwOpenAIBotName" data-form-group-class="col-md-12 col-lg-8"
                             :label="__tr('Your AI Bot Name')" name="open_ai_bot_name" value="{{ getVendorSettings('open_ai_bot_name') }}" />

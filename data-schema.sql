@@ -1,12 +1,8 @@
--- WhatsJet 5.5 +
+-- WhatsJet 6.0 +
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
-
---
--- Database: `temp_wac_17OCT2024`
---
 
 -- --------------------------------------------------------
 
@@ -15,13 +11,13 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `activity_logs` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL,
-  `user_id` int(10) UNSIGNED DEFAULT NULL,
-  `user_role_id` tinyint(3) UNSIGNED DEFAULT NULL,
-  `vendor_id` int(11) DEFAULT NULL,
+  `user_id` int UNSIGNED DEFAULT NULL,
+  `user_role_id` tinyint UNSIGNED DEFAULT NULL,
+  `vendor_id` int DEFAULT NULL,
   `activity` text
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -30,15 +26,17 @@ CREATE TABLE `activity_logs` (
 --
 
 CREATE TABLE `bot_flows` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `title` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
+  `title` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
   `__data` json DEFAULT NULL,
-  `start_trigger` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `start_trigger` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_strict_flow` tinyint UNSIGNED DEFAULT NULL,
+  `session_timeout_minutes` int UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -48,20 +46,20 @@ CREATE TABLE `bot_flows` (
 --
 
 CREATE TABLE `bot_replies` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `reply_text` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `trigger_type` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'contains,is',
-  `reply_trigger` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `priority_index` tinyint(3) UNSIGNED DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reply_text` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `trigger_type` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'contains,is',
+  `reply_trigger` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `priority_index` tinyint UNSIGNED DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `bot_flows__id` int(10) UNSIGNED DEFAULT NULL,
-  `bot_replies__id` int(10) UNSIGNED DEFAULT NULL
+  `bot_flows__id` int UNSIGNED DEFAULT NULL,
+  `bot_replies__id` int UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -71,20 +69,20 @@ CREATE TABLE `bot_replies` (
 --
 
 CREATE TABLE `campaigns` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `whatsapp_templates__id` int(10) UNSIGNED DEFAULT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `whatsapp_templates__id` int UNSIGNED DEFAULT NULL,
   `scheduled_at` datetime DEFAULT NULL,
-  `users__id` int(10) UNSIGNED DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
-  `template_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `users__id` int UNSIGNED DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `template_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `template_language` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `timezone` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `template_language` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `timezone` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -94,13 +92,13 @@ CREATE TABLE `campaigns` (
 --
 
 CREATE TABLE `campaign_groups` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `campaigns__id` int(10) UNSIGNED NOT NULL,
-  `contact_groups__id` int(10) UNSIGNED NOT NULL
+  `campaigns__id` int UNSIGNED NOT NULL,
+  `contact_groups__id` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -110,12 +108,12 @@ CREATE TABLE `campaign_groups` (
 --
 
 CREATE TABLE `configurations` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
-  `name` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `value` text COLLATE utf8mb4_unicode_ci,
-  `data_type` tinyint(4) DEFAULT NULL
+  `name` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `value` longtext COLLATE utf8mb4_unicode_ci,
+  `data_type` tinyint DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -125,25 +123,45 @@ CREATE TABLE `configurations` (
 --
 
 CREATE TABLE `contacts` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `first_name` varchar(150) CHARACTER SET utf8mb4 DEFAULT NULL,
-  `last_name` varchar(150) CHARACTER SET utf8mb4 DEFAULT NULL,
-  `countries__id` smallint(5) UNSIGNED DEFAULT NULL,
-  `whatsapp_opt_out` tinyint(3) UNSIGNED DEFAULT NULL,
+  `first_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `last_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `countries__id` smallint UNSIGNED DEFAULT NULL,
+  `whatsapp_opt_out` tinyint UNSIGNED DEFAULT NULL,
   `phone_verified_at` datetime DEFAULT NULL,
-  `email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `email_verified_at` datetime DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
-  `wa_id` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Its phone number with country code without + or 0 prefix',
-  `language_code` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `disable_ai_bot` tinyint(3) UNSIGNED DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `wa_id` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Its phone number with country code without + or 0 prefix',
+  `language_code` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `disable_ai_bot` tinyint UNSIGNED DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `assigned_users__id` int(10) UNSIGNED DEFAULT NULL
+  `assigned_users__id` int UNSIGNED DEFAULT NULL,
+  `disable_reply_bot` tinyint UNSIGNED DEFAULT NULL,
+  `wa_blocked_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `contact_bot_flow_sessions`
+--
+
+CREATE TABLE `contact_bot_flow_sessions` (
+  `_id` int UNSIGNED NOT NULL,
+  `_uid` char(36) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `bot_flows__id` int UNSIGNED NOT NULL,
+  `contacts__id` int UNSIGNED NOT NULL,
+  `bot_replies__id` int UNSIGNED DEFAULT NULL,
+  `timeout_at` datetime DEFAULT NULL,
+  `last_whatsapp_message_logs__id` int UNSIGNED DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -152,15 +170,15 @@ CREATE TABLE `contacts` (
 --
 
 CREATE TABLE `contact_custom_fields` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
   `input_name` varchar(255) NOT NULL,
   `input_type` varchar(15) DEFAULT NULL COMMENT 'Text,number,email etc',
-  `vendors__id` int(10) UNSIGNED NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  `vendors__id` int UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -169,14 +187,14 @@ CREATE TABLE `contact_custom_fields` (
 --
 
 CREATE TABLE `contact_custom_field_values` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `contacts__id` int(10) UNSIGNED NOT NULL,
-  `contact_custom_fields__id` int(10) UNSIGNED NOT NULL,
-  `field_value` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `contacts__id` int UNSIGNED NOT NULL,
+  `contact_custom_fields__id` int UNSIGNED NOT NULL,
+  `field_value` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -186,14 +204,14 @@ CREATE TABLE `contact_custom_field_values` (
 --
 
 CREATE TABLE `contact_groups` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -203,13 +221,13 @@ CREATE TABLE `contact_groups` (
 --
 
 CREATE TABLE `contact_labels` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `labels__id` int(10) UNSIGNED NOT NULL,
-  `contacts__id` int(10) UNSIGNED NOT NULL
+  `labels__id` int UNSIGNED NOT NULL,
+  `contacts__id` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -219,14 +237,32 @@ CREATE TABLE `contact_labels` (
 --
 
 CREATE TABLE `countries` (
-  `_id` smallint(5) UNSIGNED NOT NULL,
-  `iso_code` char(2) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `name_capitalized` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `iso3_code` char(3) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `iso_num_code` smallint(6) DEFAULT NULL,
-  `phone_code` smallint(5) UNSIGNED DEFAULT NULL
+  `_id` smallint UNSIGNED NOT NULL,
+  `iso_code` char(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name_capitalized` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `iso3_code` char(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `iso_num_code` smallint DEFAULT NULL,
+  `phone_code` smallint UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `credit_transactions`
+--
+
+CREATE TABLE `credit_transactions` (
+  `_id` int UNSIGNED NOT NULL,
+  `_uid` char(36) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `credits` bigint DEFAULT NULL,
+  `type` varchar(45) DEFAULT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `whatsapp_message_logs__id` int UNSIGNED DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -235,12 +271,12 @@ CREATE TABLE `countries` (
 --
 
 CREATE TABLE `failed_jobs` (
-  `id` bigint(20) UNSIGNED NOT NULL,
-  `uuid` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `connection` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `queue` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `payload` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `exception` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` bigint UNSIGNED NOT NULL,
+  `uuid` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `connection` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `queue` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `payload` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `exception` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `failed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -251,13 +287,13 @@ CREATE TABLE `failed_jobs` (
 --
 
 CREATE TABLE `group_contacts` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `contact_groups__id` int(10) UNSIGNED NOT NULL,
-  `contacts__id` int(10) UNSIGNED NOT NULL
+  `contact_groups__id` int UNSIGNED NOT NULL,
+  `contacts__id` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -267,13 +303,13 @@ CREATE TABLE `group_contacts` (
 --
 
 CREATE TABLE `jobs` (
-  `id` bigint(20) UNSIGNED NOT NULL,
-  `queue` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `payload` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `attempts` tinyint(3) UNSIGNED NOT NULL,
-  `reserved_at` int(10) UNSIGNED DEFAULT NULL,
-  `available_at` int(10) UNSIGNED NOT NULL,
-  `created_at` int(10) UNSIGNED NOT NULL
+  `id` bigint UNSIGNED NOT NULL,
+  `queue` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `payload` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `attempts` tinyint UNSIGNED NOT NULL,
+  `reserved_at` int UNSIGNED DEFAULT NULL,
+  `available_at` int UNSIGNED NOT NULL,
+  `created_at` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -283,16 +319,16 @@ CREATE TABLE `jobs` (
 --
 
 CREATE TABLE `labels` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `title` varchar(45) CHARACTER SET utf8mb4 NOT NULL,
+  `title` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `text_color` varchar(10) DEFAULT NULL,
   `bg_color` varchar(10) DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  `vendors__id` int UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -301,12 +337,12 @@ CREATE TABLE `labels` (
 --
 
 CREATE TABLE `login_attempts` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   `ip_address` varchar(45) NOT NULL,
-  `attempts` tinyint(4) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  `attempts` tinyint NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -315,14 +351,14 @@ CREATE TABLE `login_attempts` (
 --
 
 CREATE TABLE `login_logs` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   `email` varchar(255) DEFAULT NULL,
-  `role` tinyint(4) NOT NULL,
-  `user_id` int(10) UNSIGNED NOT NULL,
+  `role` tinyint NOT NULL,
+  `user_id` int UNSIGNED NOT NULL,
   `ip_address` varchar(45) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -331,7 +367,7 @@ CREATE TABLE `login_logs` (
 --
 
 CREATE TABLE `manual_subscriptions` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) NOT NULL,
   `status` varchar(10) DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
@@ -339,11 +375,16 @@ CREATE TABLE `manual_subscriptions` (
   `plan_id` varchar(100) DEFAULT NULL,
   `ends_at` datetime DEFAULT NULL,
   `remarks` varchar(500) DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
   `charges` decimal(13,4) DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `charges_frequency` varchar(45) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  `charges_frequency` varchar(45) DEFAULT NULL,
+  `is_auto_recurring` tinyint UNSIGNED DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `gateway` varchar(45) DEFAULT NULL,
+  `gateway_price_id` varchar(150) DEFAULT NULL,
+  `trial_ends_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -352,13 +393,13 @@ CREATE TABLE `manual_subscriptions` (
 --
 
 CREATE TABLE `message_labels` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `labels__id` int(10) UNSIGNED NOT NULL,
-  `whatsapp_message_logs__id` int(10) UNSIGNED NOT NULL
+  `labels__id` int UNSIGNED NOT NULL,
+  `whatsapp_message_logs__id` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -368,18 +409,18 @@ CREATE TABLE `message_labels` (
 --
 
 CREATE TABLE `pages` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime DEFAULT NULL,
-  `status` tinyint(3) UNSIGNED NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `show_in_menu` tinyint(3) UNSIGNED DEFAULT NULL,
-  `content` text COLLATE utf8mb4_unicode_ci,
-  `type` tinyint(3) UNSIGNED NOT NULL,
-  `vendors__id` int(10) UNSIGNED DEFAULT NULL,
-  `slug` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `image_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `status` tinyint UNSIGNED NOT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `show_in_menu` tinyint UNSIGNED DEFAULT NULL,
+  `content` longtext COLLATE utf8mb4_unicode_ci,
+  `type` tinyint UNSIGNED NOT NULL,
+  `vendors__id` int UNSIGNED DEFAULT NULL,
+  `slug` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `image_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -389,11 +430,11 @@ CREATE TABLE `pages` (
 --
 
 CREATE TABLE `password_resets` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL,
   `email` varchar(255) NOT NULL,
   `token` varchar(255) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -402,13 +443,13 @@ CREATE TABLE `password_resets` (
 --
 
 CREATE TABLE `subscriptions` (
-  `id` bigint(19) UNSIGNED NOT NULL,
-  `vendor_model__id` bigint(19) UNSIGNED NOT NULL,
-  `type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `stripe_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `stripe_status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `stripe_price` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `quantity` int(11) DEFAULT NULL,
+  `id` bigint UNSIGNED NOT NULL,
+  `vendor_model__id` bigint UNSIGNED NOT NULL,
+  `type` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stripe_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stripe_status` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stripe_price` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `quantity` int DEFAULT NULL,
   `trial_ends_at` timestamp NULL DEFAULT NULL,
   `ends_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -422,14 +463,14 @@ CREATE TABLE `subscriptions` (
 --
 
 CREATE TABLE `subscription_items` (
-  `id` bigint(19) UNSIGNED NOT NULL,
-  `stripe_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `stripe_product` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `stripe_price` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `quantity` int(11) DEFAULT NULL,
+  `id` bigint UNSIGNED NOT NULL,
+  `stripe_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stripe_product` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `stripe_price` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantity` int DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
-  `subscription_id` bigint(19) UNSIGNED NOT NULL
+  `subscription_id` bigint UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -439,19 +480,19 @@ CREATE TABLE `subscription_items` (
 --
 
 CREATE TABLE `tickets` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `contacts__id` int(10) UNSIGNED NOT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
-  `subject` varchar(150) CHARACTER SET utf8mb4 DEFAULT NULL,
-  `description` varchar(500) CHARACTER SET utf8mb4 DEFAULT NULL,
-  `priority` varchar(10) CHARACTER SET utf8 DEFAULT NULL,
-  `vendor_users__id` int(10) UNSIGNED DEFAULT NULL,
+  `contacts__id` int UNSIGNED NOT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `subject` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `priority` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `vendor_users__id` int UNSIGNED DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `assigned_users__id` int(10) UNSIGNED DEFAULT NULL
+  `assigned_users__id` int UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -461,20 +502,21 @@ CREATE TABLE `tickets` (
 --
 
 CREATE TABLE `transactions` (
-  `_id` int(10) UNSIGNED NOT NULL,
-  `_uid` char(36) NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `_id` int UNSIGNED NOT NULL,
+  `_uid` char(36) COLLATE utf8mb4_general_ci NOT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
   `amount` decimal(13,4) DEFAULT NULL,
-  `reference_id` varchar(45) NOT NULL,
-  `notes` varchar(500) DEFAULT NULL,
+  `reference_id` varchar(45) COLLATE utf8mb4_general_ci NOT NULL,
+  `notes` varchar(500) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED DEFAULT NULL,
-  `subscriptions_id` bigint(19) UNSIGNED DEFAULT NULL,
-  `type` varchar(45) DEFAULT NULL,
-  `manual_subscriptions__id` int(10) UNSIGNED DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `vendors__id` int UNSIGNED DEFAULT NULL,
+  `subscriptions_id` bigint UNSIGNED DEFAULT NULL,
+  `type` varchar(45) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `manual_subscriptions__id` int UNSIGNED DEFAULT NULL,
+  `credit_transactions__id` int UNSIGNED DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -483,28 +525,47 @@ CREATE TABLE `transactions` (
 --
 
 CREATE TABLE `users` (
-  `_id` int(10) UNSIGNED NOT NULL,
-  `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
+  `_uid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
-  `username` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `password` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` tinyint(3) UNSIGNED NOT NULL,
-  `remember_token` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `first_name` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `mobile_number` varchar(15) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Make unique with country phone code',
-  `timezone` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `registered_via` varchar(15) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Social account',
-  `ban_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `countries__id` smallint(5) UNSIGNED DEFAULT NULL,
-  `two_factor_secret` text COLLATE utf8mb4_unicode_ci,
-  `two_factor_recovery_codes` text COLLATE utf8mb4_unicode_ci,
+  `username` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` tinyint UNSIGNED NOT NULL,
+  `remember_token` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_name` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `mobile_number` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Make unique with country phone code',
+  `timezone` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `registered_via` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Social account',
+  `ban_reason` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `countries__id` smallint UNSIGNED DEFAULT NULL,
+  `two_factor_secret` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `two_factor_recovery_codes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `email_verified_at` datetime DEFAULT NULL,
-  `user_roles__id` tinyint(3) UNSIGNED NOT NULL,
-  `vendors__id` int(10) UNSIGNED DEFAULT NULL
+  `user_roles__id` tinyint UNSIGNED NOT NULL,
+  `vendors__id` int UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_devices`
+--
+
+CREATE TABLE `user_devices` (
+  `_id` int UNSIGNED NOT NULL,
+  `_uid` char(36) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `device_token` varchar(255) DEFAULT NULL,
+  `device_id` varchar(100) DEFAULT NULL,
+  `device_type` varchar(20) DEFAULT NULL,
+  `fcm_token` varchar(255) DEFAULT NULL,
+  `users__id` int UNSIGNED NOT NULL,
+  `vendors__id` int UNSIGNED DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -513,12 +574,12 @@ CREATE TABLE `users` (
 --
 
 CREATE TABLE `user_roles` (
-  `_id` tinyint(3) UNSIGNED NOT NULL,
+  `_id` tinyint UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED NOT NULL,
+  `status` tinyint UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -528,14 +589,14 @@ CREATE TABLE `user_roles` (
 --
 
 CREATE TABLE `user_settings` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   `key_name` varchar(45) NOT NULL,
   `value` text,
-  `data_type` tinyint(4) DEFAULT NULL,
-  `users__id` int(10) UNSIGNED NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  `data_type` tinyint DEFAULT NULL,
+  `users__id` int UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -544,23 +605,44 @@ CREATE TABLE `user_settings` (
 --
 
 CREATE TABLE `vendors` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `ban_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `type` tinyint(3) UNSIGNED DEFAULT NULL COMMENT 'Restaurent',
-  `stripe_id` varchar(255) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,
-  `pm_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `pm_last_four` varchar(4) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ban_reason` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `type` tinyint UNSIGNED DEFAULT NULL COMMENT 'Restaurent',
+  `stripe_id` varchar(255) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin DEFAULT NULL,
+  `pm_type` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `pm_last_four` varchar(4) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `trial_ends_at` timestamp NULL DEFAULT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `logo_image` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `slug` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `domain` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `favicon` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `logo_image` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `slug` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `domain` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `favicon` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `vendor_notifications`
+--
+
+CREATE TABLE `vendor_notifications` (
+  `_id` int UNSIGNED NOT NULL,
+  `_uid` char(36) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `type` varchar(45) NOT NULL,
+  `read_at` datetime DEFAULT NULL,
+  `__data` json DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `users__id` int UNSIGNED DEFAULT NULL,
+  `scheduled_at` datetime DEFAULT NULL,
+  `expiry_at` datetime DEFAULT NULL,
+  `via` varchar(45) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 -- --------------------------------------------------------
 
@@ -569,15 +651,15 @@ CREATE TABLE `vendors` (
 --
 
 CREATE TABLE `vendor_settings` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `value` longtext COLLATE utf8mb4_unicode_ci,
-  `data_type` tinyint(4) DEFAULT NULL
+  `vendors__id` int UNSIGNED NOT NULL,
+  `name` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `value` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `data_type` tinyint DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -587,13 +669,13 @@ CREATE TABLE `vendor_settings` (
 --
 
 CREATE TABLE `vendor_users` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
-  `users__id` int(10) UNSIGNED NOT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `users__id` int UNSIGNED NOT NULL,
   `__data` json DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -604,24 +686,25 @@ CREATE TABLE `vendor_users` (
 --
 
 CREATE TABLE `whatsapp_message_logs` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `message` text CHARACTER SET utf8mb4,
-  `contacts__id` int(10) UNSIGNED DEFAULT NULL,
-  `campaigns__id` int(10) UNSIGNED DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
-  `contact_wa_id` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `wamid` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `wab_phone_number_id` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `is_incoming_message` tinyint(3) UNSIGNED DEFAULT NULL COMMENT 'Incoming,outgoing',
+  `message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
+  `contacts__id` int UNSIGNED DEFAULT NULL,
+  `campaigns__id` int UNSIGNED DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
+  `contact_wa_id` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `wamid` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `wab_phone_number_id` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_incoming_message` tinyint UNSIGNED DEFAULT NULL COMMENT 'Incoming,outgoing',
   `__data` json DEFAULT NULL,
   `messaged_at` datetime DEFAULT NULL,
   `is_forwarded` tinyint(1) DEFAULT NULL,
-  `replied_to_whatsapp_message_logs__uid` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `messaged_by_users__id` int(10) UNSIGNED DEFAULT NULL
+  `replied_to_whatsapp_message_logs__uid` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `messaged_by_users__id` int UNSIGNED DEFAULT NULL,
+  `is_system_message` tinyint DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -631,18 +714,18 @@ CREATE TABLE `whatsapp_message_logs` (
 --
 
 CREATE TABLE `whatsapp_message_queue` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` tinyint(3) UNSIGNED DEFAULT NULL,
+  `status` tinyint UNSIGNED DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL,
+  `vendors__id` int UNSIGNED NOT NULL,
   `scheduled_at` datetime DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `phone_with_country_code` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `campaigns__id` int(10) UNSIGNED NOT NULL,
-  `contacts__id` int(10) UNSIGNED DEFAULT NULL,
-  `retries` tinyint(4) DEFAULT NULL
+  `phone_with_country_code` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `campaigns__id` int UNSIGNED NOT NULL,
+  `contacts__id` int UNSIGNED DEFAULT NULL,
+  `retries` tinyint DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -652,18 +735,36 @@ CREATE TABLE `whatsapp_message_queue` (
 --
 
 CREATE TABLE `whatsapp_templates` (
-  `_id` int(10) UNSIGNED NOT NULL,
+  `_id` int UNSIGNED NOT NULL,
   `_uid` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` varchar(15) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `template_name` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `template_name` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `updated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `template_id` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `category` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `language` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `template_id` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `category` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `language` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `__data` json DEFAULT NULL,
-  `vendors__id` int(10) UNSIGNED NOT NULL
+  `vendors__id` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `whatsapp_webhook_queue`
+--
+
+CREATE TABLE `whatsapp_webhook_queue` (
+  `_id` int UNSIGNED NOT NULL,
+  `_uid` char(36) NOT NULL,
+  `headers` json DEFAULT NULL,
+  `payload` json DEFAULT NULL,
+  `status` varchar(15) DEFAULT 'pending',
+  `attempted_at` timestamp NULL DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `vendors__id` int UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 --
 -- Indexes for dumped tables
@@ -680,8 +781,8 @@ ALTER TABLE `activity_logs`
 --
 ALTER TABLE `bot_flows`
   ADD PRIMARY KEY (`_id`),
-  ADD UNIQUE KEY `_uid` (`_uid`),
   ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
+  ADD UNIQUE KEY `_uid` (`_uid`),
   ADD KEY `fk_bot_flows_vendors1_idx` (`vendors__id`);
 
 --
@@ -693,7 +794,8 @@ ALTER TABLE `bot_replies`
   ADD UNIQUE KEY `_uid` (`_uid`),
   ADD KEY `fk_bot_replies_vendors1_idx` (`vendors__id`),
   ADD KEY `fk_bot_replies_bot_flows1_idx` (`bot_flows__id`),
-  ADD KEY `fk_bot_replies_bot_replies1_idx` (`bot_replies__id`);
+  ADD KEY `fk_bot_replies_bot_replies1_idx` (`bot_replies__id`),
+  ADD KEY `idx_reply_trigger` (`reply_trigger`);
 
 --
 -- Indexes for table `campaigns`
@@ -732,7 +834,20 @@ ALTER TABLE `contacts`
   ADD UNIQUE KEY `_uid` (`_uid`),
   ADD KEY `fk_contacts_countries1_idx` (`countries__id`),
   ADD KEY `fk_contacts_vendors1_idx` (`vendors__id`),
-  ADD KEY `fk_contacts_users1_idx` (`assigned_users__id`);
+  ADD KEY `fk_contacts_users1_idx` (`assigned_users__id`),
+  ADD KEY `idx_wa_id` (`wa_id`);
+
+--
+-- Indexes for table `contact_bot_flow_sessions`
+--
+ALTER TABLE `contact_bot_flow_sessions`
+  ADD PRIMARY KEY (`_id`),
+  ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
+  ADD UNIQUE KEY `_uid` (`_uid`),
+  ADD KEY `fk_contact_bot_flow_sessions_bot_flows1_idx` (`bot_flows__id`),
+  ADD KEY `fk_contact_bot_flow_sessions_contacts1_idx` (`contacts__id`),
+  ADD KEY `fk_contact_bot_flow_sessions_bot_replies1_idx` (`bot_replies__id`),
+  ADD KEY `fk_contact_bot_flow_sessions_whatsapp_message_logs1_idx` (`last_whatsapp_message_logs__id`);
 
 --
 -- Indexes for table `contact_custom_fields`
@@ -776,6 +891,16 @@ ALTER TABLE `contact_labels`
 --
 ALTER TABLE `countries`
   ADD PRIMARY KEY (`_id`);
+
+--
+-- Indexes for table `credit_transactions`
+--
+ALTER TABLE `credit_transactions`
+  ADD PRIMARY KEY (`_id`),
+  ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
+  ADD UNIQUE KEY `_uid` (`_uid`),
+  ADD KEY `fk_credit_transactions_vendors1_idx` (`vendors__id`),
+  ADD KEY `fk_credit_transactions_whatsapp_message_logs1_idx` (`whatsapp_message_logs__id`);
 
 --
 -- Indexes for table `failed_jobs`
@@ -897,7 +1022,8 @@ ALTER TABLE `transactions`
   ADD UNIQUE KEY `_uid` (`_uid`),
   ADD KEY `fk_transactions_vendors1_idx` (`vendors__id`),
   ADD KEY `fk_transactions_subscriptions1_idx` (`subscriptions_id`),
-  ADD KEY `fk_transactions_manual_subscriptions1_idx` (`manual_subscriptions__id`);
+  ADD KEY `fk_transactions_manual_subscriptions1_idx` (`manual_subscriptions__id`),
+  ADD KEY `fk_transactions_credit_transactions1_idx` (`credit_transactions__id`);
 
 --
 -- Indexes for table `users`
@@ -909,6 +1035,16 @@ ALTER TABLE `users`
   ADD KEY `fk_users_countries1_idx` (`countries__id`),
   ADD KEY `fk_users_user_roles1_idx` (`user_roles__id`),
   ADD KEY `fk_users_vendors1_idx` (`vendors__id`);
+
+--
+-- Indexes for table `user_devices`
+--
+ALTER TABLE `user_devices`
+  ADD PRIMARY KEY (`_id`),
+  ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
+  ADD UNIQUE KEY `_uid` (`_uid`),
+  ADD KEY `fk_user_devices_users1_idx` (`users__id`),
+  ADD KEY `fk_user_devices_vendors1_idx` (`vendors__id`);
 
 --
 -- Indexes for table `user_roles`
@@ -934,6 +1070,16 @@ ALTER TABLE `vendors`
   ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
   ADD UNIQUE KEY `_uid` (`_uid`),
   ADD KEY `stripe_id` (`stripe_id`);
+
+--
+-- Indexes for table `vendor_notifications`
+--
+ALTER TABLE `vendor_notifications`
+  ADD PRIMARY KEY (`_id`),
+  ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
+  ADD UNIQUE KEY `_uid` (`_uid`),
+  ADD KEY `fk_vendor_notifications_vendors1_idx` (`vendors__id`),
+  ADD KEY `fk_vendor_notifications_users1_idx` (`users__id`);
 
 --
 -- Indexes for table `vendor_settings`
@@ -963,7 +1109,10 @@ ALTER TABLE `whatsapp_message_logs`
   ADD KEY `fk_whatsapp_message_status_logs_contacts1_idx` (`contacts__id`),
   ADD KEY `fk_whatsapp_message_status_logs_campaigns1_idx` (`campaigns__id`),
   ADD KEY `fk_whatsapp_message_status_logs_vendors1_idx` (`vendors__id`),
-  ADD KEY `fk_whatsapp_message_logs_users1_idx` (`messaged_by_users__id`);
+  ADD KEY `fk_whatsapp_message_logs_users1_idx` (`messaged_by_users__id`),
+  ADD KEY `idx_wamid` (`wamid`),
+  ADD KEY `idx_contact_wa_id` (`contact_wa_id`),
+  ADD KEY `idx_wab_phone_number_id` (`wab_phone_number_id`);
 
 --
 -- Indexes for table `whatsapp_message_queue`
@@ -973,7 +1122,9 @@ ALTER TABLE `whatsapp_message_queue`
   ADD UNIQUE KEY `_uid` (`_uid`),
   ADD KEY `fk_whatsapp_message_queue_vendors1_idx` (`vendors__id`),
   ADD KEY `fk_whatsapp_message_queue_campaigns1_idx` (`campaigns__id`),
-  ADD KEY `fk_whatsapp_message_queue_contacts1_idx` (`contacts__id`);
+  ADD KEY `fk_whatsapp_message_queue_contacts1_idx` (`contacts__id`),
+  ADD KEY `idx_scheduled_at` (`scheduled_at`),
+  ADD KEY `idx_phone_with_country_code` (`phone_with_country_code`);
 
 --
 -- Indexes for table `whatsapp_templates`
@@ -982,7 +1133,17 @@ ALTER TABLE `whatsapp_templates`
   ADD PRIMARY KEY (`_id`),
   ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
   ADD UNIQUE KEY `_uid` (`_uid`),
-  ADD KEY `fk_whatsapp_templates_vendors1_idx` (`vendors__id`);
+  ADD KEY `fk_whatsapp_templates_vendors1_idx` (`vendors__id`),
+  ADD KEY `idx_template_id` (`template_id`),
+  ADD KEY `idx_template_name` (`template_name`);
+
+--
+-- Indexes for table `whatsapp_webhook_queue`
+--
+ALTER TABLE `whatsapp_webhook_queue`
+  ADD PRIMARY KEY (`_id`),
+  ADD UNIQUE KEY `_uid_UNIQUE` (`_uid`),
+  ADD KEY `fk_whatsapp_webhook_queue_vendors1_idx` (`vendors__id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -992,205 +1153,235 @@ ALTER TABLE `whatsapp_templates`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `bot_flows`
 --
 ALTER TABLE `bot_flows`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `bot_replies`
 --
 ALTER TABLE `bot_replies`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `campaigns`
 --
 ALTER TABLE `campaigns`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `campaign_groups`
 --
 ALTER TABLE `campaign_groups`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `configurations`
 --
 ALTER TABLE `configurations`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `contacts`
 --
 ALTER TABLE `contacts`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `contact_bot_flow_sessions`
+--
+ALTER TABLE `contact_bot_flow_sessions`
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `contact_custom_fields`
 --
 ALTER TABLE `contact_custom_fields`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `contact_custom_field_values`
 --
 ALTER TABLE `contact_custom_field_values`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `contact_groups`
 --
 ALTER TABLE `contact_groups`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `contact_labels`
 --
 ALTER TABLE `contact_labels`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `credit_transactions`
+--
+ALTER TABLE `credit_transactions`
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `failed_jobs`
 --
 ALTER TABLE `failed_jobs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `group_contacts`
 --
 ALTER TABLE `group_contacts`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `jobs`
 --
 ALTER TABLE `jobs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `labels`
 --
 ALTER TABLE `labels`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `login_attempts`
 --
 ALTER TABLE `login_attempts`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `login_logs`
 --
 ALTER TABLE `login_logs`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `manual_subscriptions`
 --
 ALTER TABLE `manual_subscriptions`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `message_labels`
 --
 ALTER TABLE `message_labels`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `pages`
 --
 ALTER TABLE `pages`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `password_resets`
 --
 ALTER TABLE `password_resets`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `subscriptions`
 --
 ALTER TABLE `subscriptions`
-  MODIFY `id` bigint(19) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `subscription_items`
 --
 ALTER TABLE `subscription_items`
-  MODIFY `id` bigint(19) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tickets`
 --
 ALTER TABLE `tickets`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `user_devices`
+--
+ALTER TABLE `user_devices`
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `user_roles`
 --
 ALTER TABLE `user_roles`
-  MODIFY `_id` tinyint(3) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` tinyint UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `user_settings`
 --
 ALTER TABLE `user_settings`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `vendors`
 --
 ALTER TABLE `vendors`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `vendor_notifications`
+--
+ALTER TABLE `vendor_notifications`
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `vendor_settings`
 --
 ALTER TABLE `vendor_settings`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `vendor_users`
 --
 ALTER TABLE `vendor_users`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `whatsapp_message_logs`
 --
 ALTER TABLE `whatsapp_message_logs`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `whatsapp_message_queue`
 --
 ALTER TABLE `whatsapp_message_queue`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `whatsapp_templates`
 --
 ALTER TABLE `whatsapp_templates`
-  MODIFY `_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `whatsapp_webhook_queue`
+--
+ALTER TABLE `whatsapp_webhook_queue`
+  MODIFY `_id` int UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables
@@ -1200,169 +1391,206 @@ ALTER TABLE `whatsapp_templates`
 -- Constraints for table `bot_flows`
 --
 ALTER TABLE `bot_flows`
-  ADD CONSTRAINT `fk_bot_flows_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_bot_flows_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `bot_replies`
 --
 ALTER TABLE `bot_replies`
-  ADD CONSTRAINT `fk_bot_replies_bot_flows1` FOREIGN KEY (`bot_flows__id`) REFERENCES `bot_flows` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_bot_replies_bot_replies1` FOREIGN KEY (`bot_replies__id`) REFERENCES `bot_replies` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_bot_replies_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_bot_replies_bot_flows1` FOREIGN KEY (`bot_flows__id`) REFERENCES `bot_flows` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_bot_replies_bot_replies1` FOREIGN KEY (`bot_replies__id`) REFERENCES `bot_replies` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_bot_replies_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `campaigns`
 --
 ALTER TABLE `campaigns`
-  ADD CONSTRAINT `fk_campaigns_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_campaigns_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_campaigns_whatsapp_templates1` FOREIGN KEY (`whatsapp_templates__id`) REFERENCES `whatsapp_templates` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_campaigns_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_campaigns_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_campaigns_whatsapp_templates1` FOREIGN KEY (`whatsapp_templates__id`) REFERENCES `whatsapp_templates` (`_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `campaign_groups`
 --
 ALTER TABLE `campaign_groups`
-  ADD CONSTRAINT `fk_campaign_groups_campaigns1` FOREIGN KEY (`campaigns__id`) REFERENCES `campaigns` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_campaign_groups_contact_groups1` FOREIGN KEY (`contact_groups__id`) REFERENCES `contact_groups` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_campaign_groups_campaigns1` FOREIGN KEY (`campaigns__id`) REFERENCES `campaigns` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_campaign_groups_contact_groups1` FOREIGN KEY (`contact_groups__id`) REFERENCES `contact_groups` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `contacts`
 --
 ALTER TABLE `contacts`
-  ADD CONSTRAINT `fk_contacts_countries1` FOREIGN KEY (`countries__id`) REFERENCES `countries` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_contacts_users1` FOREIGN KEY (`assigned_users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_contacts_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_contacts_countries1` FOREIGN KEY (`countries__id`) REFERENCES `countries` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_contacts_users1` FOREIGN KEY (`assigned_users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_contacts_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `contact_bot_flow_sessions`
+--
+ALTER TABLE `contact_bot_flow_sessions`
+  ADD CONSTRAINT `fk_contact_bot_flow_sessions_bot_flows1` FOREIGN KEY (`bot_flows__id`) REFERENCES `bot_flows` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_contact_bot_flow_sessions_bot_replies1` FOREIGN KEY (`bot_replies__id`) REFERENCES `bot_replies` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_contact_bot_flow_sessions_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_contact_bot_flow_sessions_whatsapp_message_logs1` FOREIGN KEY (`last_whatsapp_message_logs__id`) REFERENCES `whatsapp_message_logs` (`_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `contact_custom_fields`
 --
 ALTER TABLE `contact_custom_fields`
-  ADD CONSTRAINT `fk_contact_custom_fields_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_contact_custom_fields_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `contact_custom_field_values`
 --
 ALTER TABLE `contact_custom_field_values`
-  ADD CONSTRAINT `fk_contact_custom_field_values_contact_custom_fields1` FOREIGN KEY (`contact_custom_fields__id`) REFERENCES `contact_custom_fields` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_contact_custom_field_values_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_contact_custom_field_values_contact_custom_fields1` FOREIGN KEY (`contact_custom_fields__id`) REFERENCES `contact_custom_fields` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_contact_custom_field_values_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `contact_groups`
 --
 ALTER TABLE `contact_groups`
-  ADD CONSTRAINT `fk_groups_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_groups_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `contact_labels`
 --
 ALTER TABLE `contact_labels`
-  ADD CONSTRAINT `fk_contact_labels_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_contact_labels_labels1` FOREIGN KEY (`labels__id`) REFERENCES `labels` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_contact_labels_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_contact_labels_labels1` FOREIGN KEY (`labels__id`) REFERENCES `labels` (`_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `credit_transactions`
+--
+ALTER TABLE `credit_transactions`
+  ADD CONSTRAINT `fk_credit_transactions_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_credit_transactions_whatsapp_message_logs1` FOREIGN KEY (`whatsapp_message_logs__id`) REFERENCES `whatsapp_message_logs` (`_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `group_contacts`
 --
 ALTER TABLE `group_contacts`
-  ADD CONSTRAINT `fk_group_contacts_contact_groups1` FOREIGN KEY (`contact_groups__id`) REFERENCES `contact_groups` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_group_contacts_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_group_contacts_contact_groups1` FOREIGN KEY (`contact_groups__id`) REFERENCES `contact_groups` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_group_contacts_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `labels`
 --
 ALTER TABLE `labels`
-  ADD CONSTRAINT `fk_labels_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_labels_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `manual_subscriptions`
 --
 ALTER TABLE `manual_subscriptions`
-  ADD CONSTRAINT `fk_manual_subscriptions_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_manual_subscriptions_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `message_labels`
 --
 ALTER TABLE `message_labels`
-  ADD CONSTRAINT `fk_message_labels_labels1` FOREIGN KEY (`labels__id`) REFERENCES `labels` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_message_labels_whatsapp_message_logs1` FOREIGN KEY (`whatsapp_message_logs__id`) REFERENCES `whatsapp_message_logs` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_message_labels_labels1` FOREIGN KEY (`labels__id`) REFERENCES `labels` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_message_labels_whatsapp_message_logs1` FOREIGN KEY (`whatsapp_message_logs__id`) REFERENCES `whatsapp_message_logs` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `pages`
 --
 ALTER TABLE `pages`
-  ADD CONSTRAINT `fk_pages_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_pages_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `subscription_items`
 --
 ALTER TABLE `subscription_items`
-  ADD CONSTRAINT `fk_subscription_items_subscriptions1` FOREIGN KEY (`subscription_id`) REFERENCES `subscriptions` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_subscription_items_subscriptions1` FOREIGN KEY (`subscription_id`) REFERENCES `subscriptions` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tickets`
 --
 ALTER TABLE `tickets`
-  ADD CONSTRAINT `fk_tickets_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_tickets_users1` FOREIGN KEY (`assigned_users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_tickets_vendor_users1` FOREIGN KEY (`vendor_users__id`) REFERENCES `vendor_users` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_tickets_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_tickets_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_tickets_users1` FOREIGN KEY (`assigned_users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_tickets_vendor_users1` FOREIGN KEY (`vendor_users__id`) REFERENCES `vendor_users` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_tickets_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `transactions`
 --
 ALTER TABLE `transactions`
-  ADD CONSTRAINT `fk_transactions_manual_subscriptions1` FOREIGN KEY (`manual_subscriptions__id`) REFERENCES `manual_subscriptions` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_transactions_subscriptions1` FOREIGN KEY (`subscriptions_id`) REFERENCES `subscriptions` (`id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_transactions_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_transactions_credit_transactions1` FOREIGN KEY (`credit_transactions__id`) REFERENCES `credit_transactions` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_transactions_manual_subscriptions1` FOREIGN KEY (`manual_subscriptions__id`) REFERENCES `manual_subscriptions` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_transactions_subscriptions1` FOREIGN KEY (`subscriptions_id`) REFERENCES `subscriptions` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_transactions_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `users`
 --
 ALTER TABLE `users`
-  ADD CONSTRAINT `fk_users_countries1` FOREIGN KEY (`countries__id`) REFERENCES `countries` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_users_user_roles1` FOREIGN KEY (`user_roles__id`) REFERENCES `user_roles` (`_id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_users_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_users_countries1` FOREIGN KEY (`countries__id`) REFERENCES `countries` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_users_user_roles1` FOREIGN KEY (`user_roles__id`) REFERENCES `user_roles` (`_id`),
+  ADD CONSTRAINT `fk_users_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_devices`
+--
+ALTER TABLE `user_devices`
+  ADD CONSTRAINT `fk_user_devices_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_user_devices_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `user_settings`
 --
 ALTER TABLE `user_settings`
-  ADD CONSTRAINT `fk_user_settings_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_user_settings_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `vendor_notifications`
+--
+ALTER TABLE `vendor_notifications`
+  ADD CONSTRAINT `fk_vendor_notifications_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_vendor_notifications_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `vendor_settings`
 --
 ALTER TABLE `vendor_settings`
-  ADD CONSTRAINT `fk_vendor_settings_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_vendor_settings_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `vendor_users`
 --
 ALTER TABLE `vendor_users`
-  ADD CONSTRAINT `fk_vendor_users_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_vendor_users_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_vendor_users_users1` FOREIGN KEY (`users__id`) REFERENCES `users` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_vendor_users_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `whatsapp_message_logs`
 --
 ALTER TABLE `whatsapp_message_logs`
-  ADD CONSTRAINT `fk_whatsapp_message_logs_users1` FOREIGN KEY (`messaged_by_users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_whatsapp_message_status_logs_campaigns1` FOREIGN KEY (`campaigns__id`) REFERENCES `campaigns` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_whatsapp_message_status_logs_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE SET NULL ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_whatsapp_message_status_logs_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_whatsapp_message_logs_users1` FOREIGN KEY (`messaged_by_users__id`) REFERENCES `users` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_whatsapp_message_status_logs_campaigns1` FOREIGN KEY (`campaigns__id`) REFERENCES `campaigns` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_whatsapp_message_status_logs_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_whatsapp_message_status_logs_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `whatsapp_message_queue`
 --
 ALTER TABLE `whatsapp_message_queue`
-  ADD CONSTRAINT `fk_whatsapp_message_queue_campaigns1` FOREIGN KEY (`campaigns__id`) REFERENCES `campaigns` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_whatsapp_message_queue_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  ADD CONSTRAINT `fk_whatsapp_message_queue_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_whatsapp_message_queue_campaigns1` FOREIGN KEY (`campaigns__id`) REFERENCES `campaigns` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_whatsapp_message_queue_contacts1` FOREIGN KEY (`contacts__id`) REFERENCES `contacts` (`_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_whatsapp_message_queue_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `whatsapp_templates`
 --
 ALTER TABLE `whatsapp_templates`
-  ADD CONSTRAINT `fk_whatsapp_templates_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+  ADD CONSTRAINT `fk_whatsapp_templates_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `whatsapp_webhook_queue`
+--
+ALTER TABLE `whatsapp_webhook_queue`
+  ADD CONSTRAINT `fk_whatsapp_webhook_queue_vendors1` FOREIGN KEY (`vendors__id`) REFERENCES `vendors` (`_id`) ON DELETE CASCADE;
 COMMIT;
 
 

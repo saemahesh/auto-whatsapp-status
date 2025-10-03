@@ -3,17 +3,44 @@
     <div class="container-fluid">
         <!-- Brand -->
         <a class="h4 mb-0 text-white text-uppercase d-none d-lg-inline-block" href="{{ route('home') }}">{{ __tr('Dashboard') }}</a>
-        @if(session('loggedByVendor'))
-        <a data-method="post" href="{{ route('vendor.user.write.logout_as') }}" class="h4 mb-0 text-white d-none d-lg-inline-block lw-ajax-link-action px-5" ><i class="fa fa-arrow-left"></i> {{ __tr('You (__userFullName__) are logged to this user account , click here to go back to your account', [
-            '__userFullName__' => session('loggedByVendor.name')
-        ]) }}</a>
-        @elseif(session('loggedBySuperAdmin'))
-        <a data-method="post" href="{{ route('central.vendors.user.write.logout_as') }}" class="h4 mb-0 text-white d-none d-lg-inline-block lw-ajax-link-action px-5" ><i class="fa fa-arrow-left"></i> {{ __tr('You (__userFullName__) are logged to this vendor admin account , click here to go back to super admin section', [
-            '__userFullName__' => session('loggedBySuperAdmin.name')
-        ]) }}</a>
-        @endif
         <!-- User -->
         <ul class="navbar-nav align-items-center d-none d-md-flex">
+            @if(session('loggedByVendor') or session('loggedBySuperAdmin'))
+              <li class="nav-item dropdown no-arrow">
+                <a class="nav-link dropdown-toggle" href="#" id="lwLoggedAsSuperadminMenu" role="button" data-bs-toggle="dropdown"
+        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  <i class="fa fa-sign-in-alt"></i> {{  __tr('Logged as') }} <i class="fas fa-exclamation text-warning"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-right">
+                     @if(session('loggedByVendor'))
+                    <div class=" dropdown-header noti-title">
+                       <div class="text-muted" style="white-space: normal;text-transform:none">
+                        {{ __tr('You (__userFullName__) are logged to this user account.', [
+                            '__userFullName__' => session('loggedByVendor.name')
+                        ]) }}
+                       </div>
+                    </div>
+                    <a data-method="post" href="{{ route('vendor.user.write.logout_as') }}" class="lw-ajax-link-action px-5 dropdown-item">
+                        <span>{{ __tr('Back to your account') }}</span>
+                        <i class="fa fa-sign-in-alt mr-1"></i>
+                    </a>
+                    @elseif(session('loggedBySuperAdmin'))
+                    <div class=" dropdown-header noti-title">
+                       <div class="text-muted" style="white-space: normal;text-transform:none">
+                         {{ __tr('You (__userFullName__) are logged to this vendor admin account.', [
+                            '__userFullName__' => session('loggedBySuperAdmin.name')
+                        ]) }}
+                       </div>
+                    </div>
+                    <a data-method="post" href="{{ route('central.vendors.user.write.logout_as') }}" class="lw-ajax-link-action px-5 dropdown-item">
+                        <span>{{ __tr('Back to Super Admin area') }}</span>
+                        <i class="fa fa-sign-in-alt mr-1"></i>
+                    </a>
+                    @endif
+                </div>
+              </li>
+            @endif
+              </li>
              <!--theme change -->
              @if(getAppSettings('allow_to_change_theme'))
              <li class="nav-item">

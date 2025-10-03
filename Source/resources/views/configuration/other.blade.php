@@ -7,24 +7,40 @@
             <div>
                 <x-lw.input-field data-form-group-class="col-lg-4 col-sm-6 col-md-3" type="number" min="0" :label="__tr('Number of Messages per lot for campaigns')" name="cron_process_messages_per_lot" value="{{ getAppSettings('cron_process_messages_per_lot') }}" required />
             <div class="col text-sm text-info">
-                {{ __tr('Based on your server capacity you can set how many messages should be processed every 5 Seconds (cron job) OR per lot for queue job or when CRON URL requests executes for the Campaign Messages.') }}
+                {{ __tr('Based on your server capacity you can set how many messages should be processed per lot which is every 5 Seconds for Cron job OR per job for Queue job or when CRON URL requests executes for the Campaign Messages.') }}
             </div>
             </div>
             <hr class="my-4">
-            <fieldset class="col mt-4" x-cloak x-data="{enable_queue_jobs_for_campaigns:'{{ getAppSettings('enable_queue_jobs_for_campaigns') }}'}">
+            <div class="pl-3">
+                <x-lw.checkbox id="lwRequeueHealthyErrorMsg" name="enable_requeue_healthy_error_msg" data-size="small" :offValue="0" data-lw-plugin="lwSwitchery" :checked="getAppSettings('enable_requeue_healthy_error_msg')" :label="__tr('Enable Requeue Messages')" />
+                <div class=" text-sm text-info">
+                    {{ __tr('If enabled, the application will requeue and retry messages for few attempts that are failed due to WhatsApp API Healthy ecosystem.') }}
+                </div>
+            </div>
+            <hr class="my-4">
+            <fieldset class="col mt-4" x-cloak x-data="{enable_queue_jobs_for_campaigns:'{{ getAppSettings('enable_queue_jobs_for_campaigns') ? 1 : 0 }}'}">
+                {{-- QueueJob --}}
                 <legend>{{ __tr('Cron or Queue Job Setup') }} <span class="text-danger my-2">{{ __tr('* required for the campaigns to run as per schedule') }}</span></legend>
                 <div class="form-group">
-                    <label for="enableQueueJobsForCampaigns">
-                        <x-lw.checkbox id="enableQueueJobsForCampaigns" data-secondary-color="#faab43" @click="(enable_queue_jobs_for_campaigns = !enable_queue_jobs_for_campaigns)" name="enable_queue_jobs_for_campaigns" :offValue="0" data-lw-plugin="lwSwitchery" :checked="getAppSettings('enable_queue_jobs_for_campaigns')" :label="__tr('Enabled - ')" /> <span x-show="enable_queue_jobs_for_campaigns">{{  __tr('Queue Job/Worker') }}</span> <span x-show="!enable_queue_jobs_for_campaigns">{{  __tr('Cron Job') }}</span>
-                    </label>
+                    <h3>
+                        <input x-model="enable_queue_jobs_for_campaigns" type="radio" id="lwCronJobRadio" name="enable_queue_jobs_for_campaigns" value="0"> <label for="lwCronJobRadio">{{  __tr('Cron Job') }}</label><br>
+                        <input x-model="enable_queue_jobs_for_campaigns" type="radio" id="lwQueueJobRadio" name="enable_queue_jobs_for_campaigns" value="1"> <label for="lwQueueJobRadio">{{  __tr('Queue Job/Worker') }}</label>
+                    </h3>
                 </div>
-                <fieldset x-show="enable_queue_jobs_for_campaigns" class="">
+                <fieldset x-show="enable_queue_jobs_for_campaigns == 1" class="">
+                    @if (swaksharyipadtalni())
+                    @if (config('queue.default') == 'sync')
+                    <div class="alert alert-warning">
+                        {{  __tr('IMPORTANT: As the Queue Connection is set to sync, it will not work properly, Set it to different connection from .env file like database or you may using something else.') }}
+                    </div>
+                    @endif
+                    @endif
                     <legend>{{  __tr('Queue Job Setup Instructions') }}</legend>
                    <div>
-                    {{  __tr('You need to configure your queue driver as required in .env file. Database tables for the database driver already provided no need to migrate to create tables.') }} <a target="_blank" href="https://laravel.com/docs/10.x/queues">{{  __tr('Laravel Queues') }} <i class="fa fa-external-link-alt"></i></a>
+                    {{  __tr('You need to configure your queue driver as required in .env file. Database tables for the database driver already provided no need to migrate to create tables.') }} <a target="_blank" href="https://laravel.com/docs/12.x/queues">{{  __tr('Laravel Queues') }} <i class="fa fa-external-link-alt"></i></a>
                    </div>
                   <div>
-                    {{  __tr('You need to run queue worker as suggested') }} <a target="_blank" href="https://laravel.com/docs/10.x/queues#running-the-queue-worker">{{  __tr('Running Queue Worker') }} <i class="fa fa-external-link-alt"></i></a>
+                    {{  __tr('You need to run queue worker as suggested') }} <a target="_blank" href="https://laravel.com/docs/12.x/queues#running-the-queue-worker">{{  __tr('Running Queue Worker') }} <i class="fa fa-external-link-alt"></i></a>
                     <div class="alert alert-dark my-3 col-sm-12 col-md-6 col-lg-4">
                         php artisan queue:work
                     </div>
@@ -41,13 +57,14 @@
                             '__doneAt__' => formatDateTime(getAppSettings('queue_setup_done_at'))
                         ]) }}
                     </h2>
+                    <a class="btn btn-danger btn-sm lw-btn-block-mobile lw-ajax-link-action" data-method="post" x-bind:data-post-data="toJsonString({'queue_setup_done_at':'','queue_setup_using_artisan_at':''})" href="<?= route('manage.configuration.write', ['pageType' => 'internals']) ?>"> <?= __tr('Queue Worker Setup: Mark as Not Done') ?></a>
                     @else
-                    <a class="btn btn-primary lw-btn-block-mobile lw-ajax-link-action" data-method="post" x-bind:data-post-data="toJsonString({'queue_setup_done_at':'{{  now() }}'})" href="<?= route('manage.configuration.write', ['pageType' => 'internals']) ?>"> <?= __tr('Queue Worker Setup: Mark as Done') ?></a>
+                    <a class="btn btn-primary btn-sm lw-btn-block-mobile lw-ajax-link-action" data-method="post" x-bind:data-post-data="toJsonString({'queue_setup_done_at':'{{  now() }}'})" href="<?= route('manage.configuration.write', ['pageType' => 'internals']) ?>"> <?= __tr('Queue Worker Setup: Mark as Done') ?></a>
                     @endif
                 </div>
                 </fieldset>
             {{-- CronJob --}}
-            <fieldset x-show="!enable_queue_jobs_for_campaigns" x-data="{panelOpened:false}" x-cloak>
+            <fieldset x-show="enable_queue_jobs_for_campaigns == 0" x-data="{panelOpened:false}" x-cloak>
                 <legend @click="panelOpened = !panelOpened">{{ __tr('Cron Job Setup') }} <small class="text-muted">{{  __tr('Click to expand/collapse') }}</small></legend>
                 <div x-show="panelOpened">
                     <p>{{  __tr('You need to setup cron as given below for every minute') }}</p>
@@ -131,8 +148,9 @@
                                 '__doneAt__' => formatDateTime(getAppSettings('cron_setup_done_at'))
                             ]) }}
                         </h2>
+                          <a class="mt-4 btn btn-danger btn-sm lw-btn-block-mobile lw-ajax-link-action" data-method="post" x-bind:data-post-data="toJsonString({'cron_setup_done_at':'','cron_setup_using_artisan_at':''})" href="<?= route('manage.configuration.write', ['pageType' => 'internals']) ?>"> <?= __tr('Cron Setup: Mark as not Done') ?></a>
                     @else
-                        <a class="btn btn-primary lw-btn-block-mobile lw-ajax-link-action" data-method="post" x-bind:data-post-data="toJsonString({'cron_setup_done_at':'{{  now() }}'})" href="<?= route('manage.configuration.write', ['pageType' => 'internals']) ?>"> <?= __tr('Cron Setup: Mark as Done') ?></a>
+                        <a class="mt-4 btn btn-primary btn-sm lw-btn-block-mobile lw-ajax-link-action" data-method="post" x-bind:data-post-data="toJsonString({'cron_setup_done_at':'{{  now() }}'})" href="<?= route('manage.configuration.write', ['pageType' => 'internals']) ?>"> <?= __tr('Cron Setup: Mark as Done') ?></a>
                         @endif
                     </div>
                 </div>
@@ -143,6 +161,29 @@
                 <button type="submit" class="btn btn-primary btn-user lw-btn-block-mobile">{{ __tr('Save') }}</button>
             </div>
         </form>
+    </fieldset>
+    <fieldset x-data="{panelOpened:false}" x-cloak>
+        <legend @click="panelOpened = !panelOpened">{{ __tr('WhatsApp Webhook Calls Handling') }} <span class="text-danger my-2">{{ __tr('* required') }}</span> <small class="text-muted">{{  __tr('Click to expand/collapse') }}</small></legend>
+        <form x-show="panelOpened" class="lw-ajax-form lw-form" method="post" action="<?= route('manage.configuration.write', ['pageType' => 'misc_settings']) ?>">
+            <div class="form-group" x-data="{enable_wa_webhook_process_using_db:'{{ getAppSettings('enable_wa_webhook_process_using_db') ? 1 : 0 }}'}">
+                    <div class="ml-2">
+                        <input x-model="enable_wa_webhook_process_using_db" type="radio" id="lwSyncProcessRadio" name="enable_wa_webhook_process_using_db" value="0"> <label for="lwSyncProcessRadio">{{  __tr('Sync - Direct process WhatsApp Webhook calls') }}</label><br>
+                        <small class="text-muted ml-2">
+                            {{  __tr('Webhook calls will be processed as soon as they come.') }}
+                        </small>
+                        <hr>
+                        <input x-model="enable_wa_webhook_process_using_db" type="radio" id="lwDbProcessRadio" name="enable_wa_webhook_process_using_db" value="1"> <label for="lwDbProcessRadio">{{  __tr('Database - Use Database to process WhatsApp Webhook calls') }} - {{  __tr('(Recommended)') }}</label>
+                        <br>
+                        <small class="text-muted ml-2">
+                            {{  __tr('Webhooks data will be stored and then will be processed by cron/queue worker') }}
+                        </small>
+                        <hr>
+                    </div>
+                </div>
+                 <div class="form-group col">
+                <button type="submit" class="btn btn-primary btn-user lw-btn-block-mobile">{{ __tr('Save') }}</button>
+            </div>
+            </form>
     </fieldset>
     <fieldset x-data="{panelOpened:false,broadcastConnectionDriver:'{{ getAppSettings('broadcast_connection_driver') }}'}" x-cloak>
         <legend @click="panelOpened = !panelOpened">{{ __tr('Realtime Communication Provider') }} <span class="text-danger my-2">{{ __tr('* required for realtime updates') }}</span> <small class="text-muted">{{  __tr('Click to expand/collapse') }}</small></legend>

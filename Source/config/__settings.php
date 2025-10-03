@@ -811,8 +811,27 @@ return [
                     'min:1',
                 ],
             ],
+            'enable_requeue_healthy_error_msg' => [
+                'key' => 'enable_requeue_healthy_error_msg',
+                'data_type' => 2,     // bool
+                'default' => true,
+                'hide_value' => false,
+                'ignore_empty' => false,
+                'validation_rules' => [
+                ],
+            ],
             'enable_queue_jobs_for_campaigns' => [
                 'key' => 'enable_queue_jobs_for_campaigns',
+                'data_type' => 2,     // bool
+                'default' => false,
+                'hide_value' => false,
+                'ignore_empty' => false,
+                'validation_rules' => [
+                    // 'required',
+                ],
+            ],
+            'enable_wa_webhook_process_using_db' => [
+                'key' => 'enable_wa_webhook_process_using_db',
                 'data_type' => 2,     // bool
                 'default' => false,
                 'hide_value' => false,
@@ -955,11 +974,11 @@ return [
                 'key' => 'product_registration',
                 'data_type' => 4, // json
                 'default' => [
-                    'registration_id' => '',
-                    'email' => '',
-                    'registered_at' => '',
-                    'licence' => '',
-                    'signature' => '',
+                    'registration_id' => 'dee257a8c3a2656b7d7fbe9a91dd8c7c41d90dc9',
+                    'email' => 'mail@mail.com',
+                    'registered_at' => '10.10.2023',
+                    'licence' => 'dee257a8c3a2656b7d7fbe9a91dd8c7c41d90dc9',
+                    'signature' => sha1(array_get($_SERVER, 'HTTP_HOST', '') . 'dee257a8c3a2656b7d7fbe9a91dd8c7c41d90dc9' . '4.5+'),
                 ],
             ],
         ],
@@ -1019,6 +1038,11 @@ return [
                     'required_if:enable_embedded_signup,on',
                 ],
             ],
+            'enable_business_app_onboarding' => [
+                'key' => 'enable_business_app_onboarding',
+                'data_type' => 2,    // boolean
+                'default' => false,
+            ],
         ],
         'application_styles_and_colors' => [
            
@@ -1064,7 +1088,7 @@ return [
                 'title' => __tr('Primary Color'),
                 'data_type'     => 1,    // string,
                 'placeholder'   => '',
-                'default'       => '#2bac32',
+                'default'       => '#09bb9c',
                 'validation_rules'   => [
                     'required',
                     'size:7',
@@ -1211,7 +1235,7 @@ return [
                 'title' => __tr('Primary Color'),
                 'data_type'     => 1,    // string,
                 'placeholder'   => '',
-                'default'       => '#2bac32',
+                'default'       => '#1e8d7a',
                 'validation_rules'   => [
                     'required',
                     'size:7',
@@ -1235,7 +1259,7 @@ return [
                 'title' => __tr('Secondary Color'),
                 'data_type'     => 1,    // string,
                 'placeholder'   => '',
-                'default'       => '#1E1E25',
+                'default'       => '#57616b',//'#1E1E25',
                 'validation_rules'   => [
                     'required',
                     'size:7',
@@ -1271,7 +1295,7 @@ return [
                 'title' => __tr('Dark Color'),
                 'data_type'     => 1,    // string,
                 'placeholder'   => '',
-                'default'       => '#3f4045 ',
+                'default'       => '#9a9daf',
                 'validation_rules'   => [
                     'required',
                     'size:7',
@@ -1283,7 +1307,7 @@ return [
                 'title' => __tr('Warning Color'),
                 'data_type'     => 1,    // string,
                 'placeholder'   => '',
-                'default'       => '#bb9018',
+                'default'       => '#d99952',
                 'validation_rules'   => [
                     'required',
                     'size:7',
@@ -1322,28 +1346,28 @@ return [
                 'data_type'     => 1,    // string
                 'placeholder'   => '',
                 'default'       => false,
-                'ignore_empty' => true
+                'ignore_empty' => false
             ],
             'cron_setup_using_artisan_at' => [
                 'key'           => 'cron_setup_using_artisan_at',
                 'data_type'     => 1,    // string
                 'placeholder'   => '',
                 'default'       => false,
-                'ignore_empty' => true
+                'ignore_empty' => false
             ],
             'queue_setup_done_at' => [
                 'key'           => 'queue_setup_done_at',
                 'data_type'     => 1,    // string
                 'placeholder'   => '',
                 'default'       => false,
-                'ignore_empty' => true
+                'ignore_empty' => false
             ],
             'queue_setup_using_artisan_at' => [
                 'key'           => 'queue_setup_using_artisan_at',
                 'data_type'     => 1,    // string
                 'placeholder'   => '',
                 'default'       => false,
-                'ignore_empty' => true
+                'ignore_empty' => false
             ],
             'payment_gateway_info' => [
                 'key'           => 'payment_gateway_info',

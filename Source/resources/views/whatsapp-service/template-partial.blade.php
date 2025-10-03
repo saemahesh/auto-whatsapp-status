@@ -4,7 +4,8 @@ $iterationIndex = 0;
 <div class="row">
     @foreach ($parameters as $parameter)
 @php
-$parameterIndex = strtr($parameter, [
+$parameterLabel = is_array($parameter) ? $parameter['label'] : $parameter;
+$parameterIndex = strtr($parameterLabel, [
         'field_' => '',
         'button_' => '',
 ]);
@@ -19,8 +20,8 @@ $parameterIndex = strtr($parameter, [
             @endif
         @endisset
     @endif
-    <x-lw.input-field  placeholder="{{  __tr('Choose or Write you own') }}" type="selectize" data-lw-plugin="lwSelectize" id="lwField_{{ $parameter }}"
-        name="{{ $parameter }}" data-form-group-class="" data-selected=" " :label="is_numeric( $parameterIndex) ? __tr('Assign content for @{{__messageParameter__}} variable', [
+    <x-lw.input-field  placeholder="{{  __tr('Choose or Write you own') }}" type="selectize" data-lw-plugin="lwSelectize" id="lwField_{{ is_array($parameter) ? $parameter['id'] : $parameter }}"
+        name="{{ is_array($parameter) ? $parameter['name'] : $parameter }}" data-form-group-class="" data-selected=" " :label="is_numeric( $parameterIndex) ? __tr('Assign content for @{{__messageParameter__}} variable', [
                 '__messageParameter__' => '<strong>'. ($subjectType == 'button' ? '1' : Str::of(Str::title($parameterIndex))->replace(
     '_', ' '
 )) .'</strong>'
@@ -28,7 +29,7 @@ $parameterIndex = strtr($parameter, [
                 '__messageParameter__' => '<strong>'. ($subjectType == 'button' ? '1' : Str::of(Str::title($parameterIndex))->replace(
     '_', ' '
 )) .'</strong>'
-            ])"  data-create="true">
+            ])"  data-create="true" required="true">
         <x-slot name="selectOptions">
             <option value="">{{ __tr('Select or Type your own') }}</option>
             <optgroup label="{{ __tr('Assign from User Contact Details') }}">

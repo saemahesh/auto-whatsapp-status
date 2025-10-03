@@ -34,5 +34,6 @@
         {{-- Business Profile Update --}}
         @if ($pageType == 'whatsapp-cloud-api-setup')
         @include('vendors.settings.business-profile-partial')
+        @include('vendors.settings.display-name')
         @endif
 @endsection()

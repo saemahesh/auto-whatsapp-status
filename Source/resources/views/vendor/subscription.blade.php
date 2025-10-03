@@ -124,6 +124,9 @@
                                    {{ __tr('Cancel Subscription') }}
                                </a>
                            @endif
+                            <!-- For Recurring Payment Only -->
+                            @stack('autoCancelSubscriptionStack')
+                            <!-- /For Recurring Payment Only -->
                        @else
                            @if ($freePlanDetails['enabled'])
                                <fieldset class="mb-4">
@@ -190,7 +193,7 @@
                @if ($currentPlan and $hasPlansForPurchase)
                    <div class="card">
                        <div class="card-header">
-                           {{ __tr('Change Plan') }}
+                           {{ __tr('Change/Renew Plan') }}
                        </div>
                        <div class="card-body" x-data="{selectedPlanFrequencyNew:null}">
                             <div class="row">
@@ -240,7 +243,7 @@
                                                     continue;
                                                 }
                                             @endphp
-                                                @if ($planSelectorId !== $planId . '___' . $itemKey)
+                                                {{-- @if ($planSelectorId !== $planId . '___' . $itemKey) --}}
                                                     <div class="form-group my-2 text-primary">
                                                         <label class="control-label" for="{{ $planId }}{{ $itemKey }}">
                                                             <input x-model="selectedPlanFrequencyNew" class="form-control-radio" type="radio" name="plan"
@@ -248,9 +251,12 @@
                                                             value="{{ $planId }}___{{ $itemKey }}">
                                                             {{ formatAmount($itemValue['charge'], true) }} /
                                                             {{ $planStructure[$planId]['charges'][$itemKey]['title'] ?? $itemKey }}
+                                                            @if ($planSelectorId == $planId . '___' . $itemKey)
+                                                            <small class="text-muted"><em>({{ __tr('Renew Current Plan') }})</em></small>
+                                                            @endif
                                                         </label>
                                                     </div>
-                                                @endif
+                                                {{-- @endif --}}
                                             @endforeach
                                         </div>
                                     </fieldset>
@@ -262,7 +268,7 @@
                                 @csrf
                                 <input type="hidden" name="plan" x-model="selectedPlanFrequencyNew">
                                 <button value="stripe" type="submit" class="mt-4 btn btn-primary">
-                                    {{ __tr('Change Plan') }}
+                                    {{ __tr('Change/Renew Plan') }}
                                 </button>
                                 </form>
                                @else
@@ -307,7 +313,7 @@
                                        {{--  yoomoney payment button --}}
                 
                                        @if (getAppSettings('enable_yoomoney'))
-                                       <label for="lwYooMoneyPaymentOption" class="mr-4"><h3><input type="radio" id="lwYooMoneyPaymentOption" name="payment_method" value="yoomoney"><img height="90" width="90" src="{{ asset('imgs/yoomoney.png') }}"> </h3></label>
+                                       <label for="lwYooMoneyPaymentOption" class="mr-4"><h3><input type="radio" id="lwYooMoneyPaymentOption" name="payment_method" value="yoomoney"><img height="100" width="90" src="{{ asset('imgs/yoomoney.png') }}"> </h3></label>
                                        @endif
                                       {{--  /yoomoney payment button --}}
                                       
@@ -454,7 +460,7 @@
                                 {{--  yoomoney payment button --}}
                                 @if (getAppSettings('enable_yoomoney'))
                             
-                                <label for="lwYooMoneyPaymentOption" class="mr-4"><h3><input type="radio" id="lwYooMoneyPaymentOption" name="payment_method" value="yoomoney"><img height="90" width="90" src="{{ asset('imgs/yoomoney.png') }}"> </h3></label>
+                                <label for="lwYooMoneyPaymentOption" class="mr-4"><h3><input type="radio" id="lwYooMoneyPaymentOption" name="payment_method" value="yoomoney"><img height="100" width="90" src="{{ asset('imgs/yoomoney.png') }}"> </h3></label>
                                 @endif
                                {{--  /yoomoney payment button --}}
                                <div class="my-3">
@@ -549,7 +555,7 @@
         // (Note that this demo uses a wider set of styles than the guide below.)
         var style = {
             base: {
-                color: '#32325d',
+                color: '#898d05',
                 fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
                 fontSmoothing: 'antialiased',
                 fontSize: '16px',

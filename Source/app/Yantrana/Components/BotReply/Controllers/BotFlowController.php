@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * BotFlowController.php - Controller file
 *
 * This file is part of the BotReply component.
@@ -14,6 +32,7 @@ use App\Yantrana\Base\BaseRequestTwo;
 use Illuminate\Database\Query\Builder;
 use App\Yantrana\Components\BotReply\BotFlowEngine;
 use App\Yantrana\Components\BotReply\BotReplyEngine;
+use App\Yantrana\Components\WhatsAppService\WhatsAppTemplateEngine;
 
 class BotFlowController extends BaseController
 {       /**
@@ -27,6 +46,11 @@ class BotFlowController extends BaseController
     protected $botReplyEngine;
 
     /**
+     * @var  WhatsAppTemplateEngine $whatsAppTemplateEngine - WhatsAppTemplate Engine
+     */
+    protected $whatsAppTemplateEngine;
+
+    /**
       * Constructor
       *
       * @param  BotFlowEngine $botFlowEngine - BotFlow Engine
@@ -36,10 +60,12 @@ class BotFlowController extends BaseController
       *-----------------------------------------------------------------------*/
     public function __construct(
         BotFlowEngine $botFlowEngine,
-        BotReplyEngine $botReplyEngine
+        BotReplyEngine $botReplyEngine,
+        WhatsAppTemplateEngine $whatsAppTemplateEngine
     ) {
         $this->botFlowEngine = $botFlowEngine;
         $this->botReplyEngine = $botReplyEngine;
+        $this->whatsAppTemplateEngine = $whatsAppTemplateEngine;
     }
 
 
@@ -210,7 +236,8 @@ class BotFlowController extends BaseController
         // load the view
         return $this->loadView('bot-reply.bot-flow.builder', array_merge([
             'dynamicFields' => $this->botReplyEngine->preDataForBots()->data('dynamicFields'),
-            'botFlowUid' => $botFlowIdOrUid
+            'botFlowUid' => $botFlowIdOrUid,
+            'templateData' => $this->whatsAppTemplateEngine->prepareApprovedTemplates()->data()
         ], $processReaction->data()));
     }
 }

@@ -1,7 +1,27 @@
 <?php
 
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Support\Arr;
 use Laravel\Cashier\Subscription;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +37,7 @@ use App\Yantrana\Components\Subscription\Models\ManualSubscriptionModel;
 use App\Yantrana\Components\Subscription\Support\SubscriptionPlanDetails;
 use App\Yantrana\Components\Contact\Repositories\ContactCustomFieldRepository;
 use App\Yantrana\Components\Subscription\Repositories\ManualSubscriptionRepository;
+use App\Yantrana\Components\WhatsAppService\Repositories\WhatsAppMessageLogRepository;
 
 if (! function_exists('getUserAuthInfo')) {
     /**
@@ -31,7 +52,7 @@ if (! function_exists('getUserAuthInfo')) {
             'authorized' => false,
             'reaction_code' => 9, // Not Authenticated
         ];
-          
+
         if (Auth::check()) {
             $userAuthInfo = viaFlashCache('user_auth_info', function () use (&$itemOrStatusCode) {
                 $user = AuthModel::with('role', 'vendor')->find(Auth::id());
@@ -65,13 +86,13 @@ if (! function_exists('getUserAuthInfo')) {
                     'permissions' => $vendorUser?->__data['permissions'],
                     'profile' => [
                         'username' => $user->username ?? '',
-                        'full_name' => ($user->first_name ?? '').' '.($user->last_name ?? ''),
+                        'full_name' => ($user->first_name ?? '') . ' ' . ($user->last_name ?? ''),
                         'first_name' => $user->first_name ?? '',
                         'last_name' => $user->last_name ?? '',
                         'email' => $user->email ?? '',
                         'mobile_number' => $user->mobile_number ?? '',
-                       
-                        
+
+
                     ],
                 ];
             });
@@ -129,7 +150,7 @@ if (! function_exists('getPublicVendorId')) {
      */
     function getPublicVendorId($vendorIdOrUid = null)
     {
-        return viaFlashCache('public_vendor_id_'.$vendorIdOrUid, function () use (&$vendorIdOrUid) {
+        return viaFlashCache('public_vendor_id_' . $vendorIdOrUid, function () use (&$vendorIdOrUid) {
             $vendorRepo = new VendorRepository();
             if ($vendorIdOrUid) {
                 $identifiedVendor = $vendorRepo->fetchIt($vendorIdOrUid);
@@ -158,7 +179,7 @@ if (! function_exists('getPublicVendorUid')) {
             return null;
         }
 
-        return viaFlashCache('public_vendor_uid_'. $publicVendorId, function () use (&$publicVendorId) {
+        return viaFlashCache('public_vendor_uid_' . $publicVendorId, function () use (&$publicVendorId) {
             $vendorRepo = new VendorRepository();
             $getVendor = $vendorRepo->fetchIt($publicVendorId);
             if (__isEmpty($getVendor)) {
@@ -203,7 +224,7 @@ if (! function_exists('cleanPath')) {
         $str = preg_replace('#/+#', '/', $str);
         $str = trim($str, '/');
 
-        return $startWith.$str;
+        return $startWith . $str;
     }
 }
 
@@ -413,7 +434,7 @@ if (! function_exists('configItem')) {
     function configItem($key, $requireKeys = null)
     {
         if (! __isEmpty($requireKeys) and ! is_array($requireKeys)) {
-            return config('__tech.'.$key.'.'.$requireKeys);
+            return config('__tech.' . $key . '.' . $requireKeys);
         }
 
         return array_get(config('__tech'), $key);
@@ -486,7 +507,7 @@ if (! function_exists('getAppSettings')) {
         // Vinod- 06 JAN 2024 - this is weird but there was issues for addons app items so we have to check if configuration is cached or not
         // if not then we will fetch default settings from config file
         // otherwise we will fetch it from flash via cache
-        if(!app()->configurationIsCached()) {
+        if (!app()->configurationIsCached()) {
             $defaultSettings = config('__settings.items');
         } else {
             $defaultSettings = viaFlashCache('app_settings_items_default', function () {
@@ -515,7 +536,16 @@ if (! function_exists('getAppSettings')) {
                             $thisSettingItem = (int) $storeConfiguration[$itemName];
                             break;
                         case 4:
-                            $thisSettingItem = json_decode($storeConfiguration[$itemName], true);
+                            if (array_get($defaultSetting, $itemName . '.hide_value', false)) {
+                                try {
+                                    $thisSettingItem = decrypt($storeConfiguration[$itemName]);
+                                } catch (\Exception $e) {
+                                    $thisSettingItem = json_encode([]);
+                                }
+                            } else {
+                                $thisSettingItem = $storeConfiguration[$itemName];
+                            }
+                            $thisSettingItem = json_decode($thisSettingItem, true);
                             break;
                         case 6:
                             $thisSettingItem = (float) $storeConfiguration[$itemName];
@@ -525,8 +555,7 @@ if (! function_exists('getAppSettings')) {
                             break;
                     }
                 }
-
-                if ($thisSettingItem and array_get($defaultSetting, $itemName.'.hide_value', false) and (is_string($thisSettingItem) or is_numeric($thisSettingItem))) {
+                if ($thisSettingItem and array_get($defaultSetting, $itemName . '.hide_value', false) and (is_string($thisSettingItem) or is_numeric($thisSettingItem))) {
                     try {
                         $thisSettingItem = decrypt($thisSettingItem);
                     } catch (\Exception $e) {
@@ -544,9 +573,9 @@ if (! function_exists('getAppSettings')) {
             $logoName = getAppSettings('logo_name');
             $logoNameInConfig = configItem('logo_name');
             if ($logoName == $logoNameInConfig) {
-                return asset('imgs/'. $logoNameInConfig);
+                return asset('imgs/' . $logoNameInConfig);
             }
-            $logoFilePath = getPathByKey('logo').'/'.$logoName;
+            $logoFilePath = getPathByKey('logo') . '/' . $logoName;
             $logoImageUrl = getMediaUrl($logoFilePath);
             return $logoImageUrl;
         }
@@ -555,9 +584,9 @@ if (! function_exists('getAppSettings')) {
             $smallLogoName = getAppSettings('small_logo_name');
             $smallLogoNameInConfig = configItem('small_logo_name');
             if (!$smallLogoName) {
-                return asset('imgs/'. $smallLogoNameInConfig);
+                return asset('imgs/' . $smallLogoNameInConfig);
             }
-            $smallLogoFilePath = getPathByKey('small_logo').'/'.$smallLogoName;
+            $smallLogoFilePath = getPathByKey('small_logo') . '/' . $smallLogoName;
             $smallLogoImageUrl = getMediaUrl($smallLogoFilePath);
             return $smallLogoImageUrl;
         }
@@ -567,12 +596,12 @@ if (! function_exists('getAppSettings')) {
             $faviconName = getAppSettings('favicon_name');
             $faviconNameInConfig = configItem('favicon_name');
             if ($faviconName == $faviconNameInConfig) {
-                return asset('imgs/'. $faviconNameInConfig);
+                return asset('imgs/' . $faviconNameInConfig);
             }
-            $faviconFilePath = getPathByKey('favicon').'/'.$faviconName;
+            $faviconFilePath = getPathByKey('favicon') . '/' . $faviconName;
             $faviconImageUrl = getMediaUrl($faviconFilePath);
             if (! $faviconImageUrl) {
-                $faviconImageUrl = asset('imgs/'.configItem('favicon_name'));
+                $faviconImageUrl = asset('imgs/' . configItem('favicon_name'));
             }
 
             return $faviconImageUrl;
@@ -582,9 +611,9 @@ if (! function_exists('getAppSettings')) {
             $logoName = getAppSettings('dark_theme_logo_name');
             $logoNameInConfig = configItem('dark_theme_logo_name');
             if ($logoName == $logoNameInConfig) {
-                return asset('imgs/'. $logoNameInConfig);
+                return asset('imgs/' . $logoNameInConfig);
             }
-            $logoFilePath = getPathByKey('dark_theme_logo').'/'.$logoName;
+            $logoFilePath = getPathByKey('dark_theme_logo') . '/' . $logoName;
             $logoImageUrl = getMediaUrl($logoFilePath);
             return $logoImageUrl;
         }
@@ -593,9 +622,9 @@ if (! function_exists('getAppSettings')) {
             $smallLogoName = getAppSettings('dark_theme_small_logo_name');
             $smallLogoNameInConfig = configItem('dark_theme_small_logo_name');
             if (!$smallLogoName) {
-                return asset('imgs/'. $smallLogoNameInConfig);
+                return asset('imgs/' . $smallLogoNameInConfig);
             }
-            $smallLogoFilePath = getPathByKey('dark_theme_small_logo').'/'.$smallLogoName;
+            $smallLogoFilePath = getPathByKey('dark_theme_small_logo') . '/' . $smallLogoName;
             $smallLogoImageUrl = getMediaUrl($smallLogoFilePath);
             return $smallLogoImageUrl;
         }
@@ -605,12 +634,12 @@ if (! function_exists('getAppSettings')) {
             $faviconName = getAppSettings('dark_theme_favicon_name');
             $faviconNameInConfig = configItem('dark_theme_favicon_name');
             if ($faviconName == $faviconNameInConfig) {
-                return asset('imgs/'. $faviconNameInConfig);
+                return asset('imgs/' . $faviconNameInConfig);
             }
-            $faviconFilePath = getPathByKey('dark_theme_favicon').'/'.$faviconName;
+            $faviconFilePath = getPathByKey('dark_theme_favicon') . '/' . $faviconName;
             $faviconImageUrl = getMediaUrl($faviconFilePath);
             if (! $faviconImageUrl) {
-                $faviconImageUrl = asset('imgs/'.configItem('favicon_name'));
+                $faviconImageUrl = asset('imgs/' . configItem('favicon_name'));
             }
 
             return $faviconImageUrl;
@@ -635,7 +664,7 @@ if (! function_exists('getVendorSettings')) {
 
         $appSettings = [];
         if ($forVendorIdOrUid) {
-            $vendorFound = viaFlashCache('vendor_for_vendor_id_or_uid_'.$forVendorIdOrUid, function () use (&$forVendorIdOrUid) {
+            $vendorFound = viaFlashCache('vendor_for_vendor_id_or_uid_' . $forVendorIdOrUid, function () use (&$forVendorIdOrUid) {
                 $vendorRepo = new VendorRepository();
                 $findVendor = $vendorRepo->fetchIt($forVendorIdOrUid);
                 if (__isEmpty($findVendor)) {
@@ -659,7 +688,7 @@ if (! function_exists('getVendorSettings')) {
         // Vinod- 06 JAN 2024 - this is weird but there was issues for addons app items so we have to check if configuration is cached or not
         // if not then we will fetch default settings from config file
         // otherwise we will fetch it from flash via cache
-        if(!app()->configurationIsCached()) {
+        if (!app()->configurationIsCached()) {
             $defaultSettings = config('__vendor-settings.items');
         } else {
             $defaultSettings = viaFlashCache('app_vendor_settings_items_default', function () {
@@ -684,7 +713,7 @@ if (! function_exists('getVendorSettings')) {
                 });
             });
 
-            return Arr::get($filtered, $mainItemKey.'.'.$itemName.'.'.$otherItem);
+            return Arr::get($filtered, $mainItemKey . '.' . $itemName . '.' . $otherItem);
         }
         if (! $vendorId) {
             return null;
@@ -697,7 +726,7 @@ if (! function_exists('getVendorSettings')) {
             }
             $storeConfiguration = $appSettings;
         } else {
-            $storeConfiguration = viaFlashCache('vendor_setting_all_'.$vendorId, function () use (&$appSettings, &$vendorId, &$itemName, &$exceptItems) {
+            $storeConfiguration = viaFlashCache('vendor_setting_all_' . $vendorId, function () use (&$appSettings, &$vendorId, &$itemName, &$exceptItems) {
                 $configurationSettings = \App\Yantrana\Components\Vendor\Models\VendorSettingsModel::where('vendors__id', $vendorId)->select('name', 'value', 'data_type');
                 if (!empty($exceptItems)) {
                     $configurationSettings->whereNotIn('name', $exceptItems);
@@ -725,11 +754,10 @@ if (! function_exists('getVendorSettings')) {
         if ($itemName === 'country_code') {
             $countryCode = getVendorSettings('country');
             if ($countryCode) {
-                return viaFlashCache('vendor_setting_country_'.$vendorId, function () use ($appSettings, $vendorId) {
+                return viaFlashCache('vendor_setting_country_' . $vendorId, function () use ($appSettings, $vendorId) {
                     $countryRepository = new CountryRepository();
                     return $countryRepository->onlyColumns(['iso_code'])->fetchIt(getVendorSettings('country'))->iso_code;
                 });
-
             }
 
             return null;
@@ -753,7 +781,16 @@ if (! function_exists('getVendorSettings')) {
                             $thisSettingItem = (int) $storeConfiguration[$itemName];
                             break;
                         case 4:
-                            $thisSettingItem = json_decode($storeConfiguration[$itemName], true);
+                            if (array_get($defaultSetting, $itemName . '.hide_value', false)) {
+                                try {
+                                    $thisSettingItem = decrypt($storeConfiguration[$itemName]);
+                                } catch (\Exception $e) {
+                                    $thisSettingItem = json_encode([]);
+                                }
+                            } else {
+                                $thisSettingItem = $storeConfiguration[$itemName];
+                            }
+                            $thisSettingItem = json_decode($thisSettingItem, true);
                             break;
                         case 6:
                             $thisSettingItem = (float) $storeConfiguration[$itemName];
@@ -763,7 +800,7 @@ if (! function_exists('getVendorSettings')) {
                             break;
                     }
                 }
-                if ($thisSettingItem and array_get($defaultSetting, $itemName.'.hide_value', false) and (is_string($thisSettingItem) or is_numeric($thisSettingItem))) {
+                if ($thisSettingItem and array_get($defaultSetting, $itemName . '.hide_value', false) and (is_string($thisSettingItem) or is_numeric($thisSettingItem))) {
                     try {
                         $thisSettingItem = decrypt($thisSettingItem);
                     } catch (\Exception $e) {
@@ -779,7 +816,7 @@ if (! function_exists('getVendorSettings')) {
             $logoName = $storeConfiguration['logo_image'];
             $logoFilePath = getPathByKey('vendor_logo', [
                 '{_uid}' => $vendorUid,
-            ]).'/'.$logoName;
+            ]) . '/' . $logoName;
             $logoImageUrl = getMediaUrl($logoFilePath);
             if (! $logoImageUrl) {
                 $logoImageUrl = '';
@@ -794,10 +831,10 @@ if (! function_exists('getVendorSettings')) {
             $faviconName = getVendorSettings('favicon_name');
             $faviconFilePath = getPathByKey('vendor_favicon', [
                 '{_uid}' => $vendorUid,
-            ]).'/'.$faviconName;
+            ]) . '/' . $faviconName;
             $faviconImageUrl = getMediaUrl($faviconFilePath);
             if (! $faviconImageUrl) {
-                $faviconImageUrl = asset('imgs/'.configItem('favicon_name'));
+                $faviconImageUrl = asset('imgs/' . configItem('favicon_name'));
             }
 
             return $faviconImageUrl;
@@ -830,7 +867,7 @@ if (! function_exists('getMediaUrl')) {
             if (substr($storagePath, -1) == '/') {
                 $separator = '';
             }
-            $storagePath .= $separator.$filename;
+            $storagePath .= $separator . $filename;
         }
         $currentFileSystemDriver = config('filesystems.default', 'public-media-storage'); //('current_filesystem_driver');
         $storagePath = cleanPath($storagePath);
@@ -841,8 +878,8 @@ if (! function_exists('getMediaUrl')) {
                 : null; */
             $assetUrl = asset($storagePath);
             if (config('app.debug')) {
-                return env('NGROK_URL') ? strtr($assetUrl, [
-                    asset('/') => env('NGROK_URL'),
+                return config('__misc.ngrok_url') ? strtr($assetUrl, [
+                    request()->isSecure() ? secure_asset('/') : asset('/') => config('__misc.ngrok_url'),
                 ]) : $assetUrl;
             }
 
@@ -852,10 +889,10 @@ if (! function_exists('getMediaUrl')) {
             // check if file is exists
             // if ($currentDisc->isExists($storagePath)) {
             if (config("filesystems.disks.$currentFileSystemDriver.full_url")) {
-                return config("filesystems.disks.$currentFileSystemDriver.full_url", asset('/')).$storagePath;
+                return config("filesystems.disks.$currentFileSystemDriver.full_url", asset('/')) . $storagePath;
             }
 
-            return config("filesystems.disks.$currentFileSystemDriver.url", asset('/')).$storagePath;
+            return config("filesystems.disks.$currentFileSystemDriver.url", asset('/')) . $storagePath;
             // }
         }
 
@@ -922,11 +959,11 @@ if (! function_exists('formatAmount')) {
     function formatAmount($amount = null, $currencyCode = false, $currencySymbol = false, $options = [])
     {
         if ($currencyCode === true) {
-            $currencyCode = ' '.getCurrency();
+            $currencyCode = ' ' . getCurrency();
         } elseif ($currencyCode === false) {
             $currencyCode = '';
         } else {
-            $currencyCode = ' '.$currencyCode;
+            $currencyCode = ' ' . $currencyCode;
         }
 
         if ($currencySymbol === true) {
@@ -935,7 +972,7 @@ if (! function_exists('formatAmount')) {
             $currencySymbol = '';
         }
 
-        $formattedCurrency = html_entity_decode($currencySymbol).number_format((float) $amount, 2).$currencyCode;
+        $formattedCurrency = html_entity_decode($currencySymbol) . number_format((float) $amount, 2) . $currencyCode;
 
         return __tr($formattedCurrency);
     }
@@ -1012,7 +1049,7 @@ if (! function_exists('getConfigPaidPlans')) {
     function getConfigPaidPlans($plansItem = null)
     {
         if ($plansItem) {
-            return getConfigPlans('paid.'.$plansItem);
+            return getConfigPlans('paid.' . $plansItem);
         }
 
         return getConfigPlans('paid');
@@ -1029,7 +1066,7 @@ if (! function_exists('getConfigFreePlan')) {
     function getConfigFreePlan($plansItem = null)
     {
         if ($plansItem) {
-            return getConfigPlans('free.'.$plansItem);
+            return getConfigPlans('free.' . $plansItem);
         }
 
         return getConfigPlans('free');
@@ -1088,7 +1125,7 @@ if (! function_exists('getConfigPlans')) {
     function getConfigPlans($plansItem = null)
     {
         if ($plansItem) {
-            return config('lw-plans.'.$plansItem);
+            return config('lw-plans.' . $plansItem);
         }
 
         return config('lw-plans');
@@ -1148,7 +1185,7 @@ if (! function_exists('getVendorCurrentActiveSubscription')) {
      */
     function getVendorCurrentActiveSubscription($vendorId)
     {
-        return viaFlashCache('current_user_active_subscription_vendor_'.$vendorId, function () use (&$vendorId) {
+        return viaFlashCache('current_user_active_subscription_vendor_' . $vendorId, function () use (&$vendorId) {
             $stripeSubscription =  Subscription::query()->where(['vendor_model__id' => $vendorId])->active()->first();
             if (__isEmpty($stripeSubscription)) {
                 $stripeSubscription = ManualSubscriptionModel::where([
@@ -1230,10 +1267,13 @@ if (! function_exists('vendorPlanDetails')) {
             $detailsContainer['plan_type'] = 'paid';
             $detailsContainer['plan_title'] = getPaidPlans("{$planId}.title");
             $planCharges = getPaidPlans("{$planId}.charges");
-            foreach ($planCharges as $chargesKey => $chargesValue) {
-                if ($chargesValue['price_id'] == ($subscription->stripe_price ?? null)) {
-                    $detailsContainer['frequency'] = $chargesKey;
-                    break;
+
+            if (!__isEmpty($planCharges)) {
+                foreach ($planCharges as $chargesKey => $chargesValue) {
+                    if ($chargesValue['price_id'] == ($subscription->stripe_price ?? null)) {
+                        $detailsContainer['frequency'] = $chargesKey;
+                        break;
+                    }
                 }
             }
         }
@@ -1246,7 +1286,7 @@ if (! function_exists('vendorPlanDetails')) {
             $detailsContainer['message'] = __tr('Available Unlimited');
         }
         // may over usages
-        elseif ($currentUsage >= $featureLimitCount) {
+        elseif ($currentUsage > $featureLimitCount) {
             $isAvailable = -1;
             if ($detailsContainer['has_active_plan'] === true) {
                 $detailsContainer['message'] = __tr('You used up your __limitDuration__ plan allowed __resourceLimit__ limit, please upgrade your plan.', [
@@ -1258,6 +1298,7 @@ if (! function_exists('vendorPlanDetails')) {
         if ($subscription->charges_frequency ?? null) {
             $detailsContainer['frequency'] = $subscription->charges_frequency ?? null;
         }
+
         $detailsContainer['is_limit_available'] = (int) $isAvailable > 0 ? true : false;
         $detailsContainer['plan_feature_limit'] = $featureLimitCount;
         $detailsContainer['ends_at'] = $subscription->ends_at ?? null;
@@ -1498,7 +1539,7 @@ if (! function_exists('updateModelsViaVendorBroadcast')) {
     function updateModelsViaVendorBroadcast(string $vendorUid, array $data)
     {
         return event(new VendorChannelBroadcast($vendorUid, [
-             'eventModelUpdate' => $data
+            'eventModelUpdate' => $data
         ]));
     }
 }
@@ -1513,8 +1554,8 @@ if (! function_exists('getViaSharedUrl')) {
     function getViaSharedUrl(string $webhookUrl)
     {
         if (config('app.debug')) {
-            $webhookUrl = env('NGROK_URL') ? strtr($webhookUrl, [
-                secure_url('/') . '/' => env('NGROK_URL'),
+            $webhookUrl = config('__misc.ngrok_url') ? strtr($webhookUrl, [
+                (request()->isSecure() ? secure_url('/') : url('/')) . '/' => config('__misc.ngrok_url'),
             ]) : $webhookUrl;
         }
         return $webhookUrl;
@@ -1571,7 +1612,18 @@ if (! function_exists('isWhatsAppBusinessAccountReady')) {
         if (!$vendorIdOrUid) {
             $vendorIdOrUid = getVendorId();
         }
-        return getVendorSettings('facebook_app_id', null, null, $vendorIdOrUid) and getVendorSettings('whatsapp_access_token', null, null, $vendorIdOrUid) and getVendorSettings('whatsapp_business_account_id', null, null, $vendorIdOrUid) and getVendorSettings('current_phone_number_number', null, null, $vendorIdOrUid) and getVendorSettings('current_phone_number_id', null, null, $vendorIdOrUid) and getVendorSettings('webhook_verified_at', null, null, $vendorIdOrUid) and !getVendorSettings('whatsapp_access_token_expired', null, null, $vendorIdOrUid);
+        return getVendorSettings('facebook_app_id', null, null, $vendorIdOrUid)
+            and getVendorSettings('whatsapp_access_token', null, null, $vendorIdOrUid)
+            and getVendorSettings('whatsapp_business_account_id', null, null, $vendorIdOrUid)
+            and getVendorSettings('current_phone_number_number', null, null, $vendorIdOrUid)
+            and getVendorSettings('current_phone_number_id', null, null, $vendorIdOrUid)
+            and getVendorSettings('webhook_verified_at', null, null, $vendorIdOrUid)
+            and !getVendorSettings(
+                'whatsapp_access_token_expired',
+                null,
+                null,
+                $vendorIdOrUid
+            );
     }
 }
 
@@ -1758,14 +1810,13 @@ if (! function_exists('slugIt')) {
         // Convert all dashes/underscores into separator
         $flip = $separator == '-' ? '_' : '-';
 
-        $title = preg_replace('!['.preg_quote($flip).']+!u', $separator, $title);
+        $title = preg_replace('![' . preg_quote($flip) . ']+!u', $separator, $title);
 
         // Replace all separator characters and whitespace by a single separator
-        $title = preg_replace('!['.preg_quote($separator).'\s]+!u', $separator, $title);
+        $title = preg_replace('![' . preg_quote($separator) . '\s]+!u', $separator, $title);
 
         return Str::slug(strtolower(trim($title, $separator)));
     }
-
 }
 
 if (! function_exists('getActivePages')) {
@@ -1814,7 +1865,7 @@ if (! function_exists('dispatchVendorWebhook')) {
         $vendorPlanDetails = vendorPlanDetails('api_access', 0, $vendorId);
         if ($vendorPlanDetails['is_limit_available'] and getVendorSettings('enable_vendor_webhook', null, null, $vendorId) and ($vendorWebhookEndpoint = getVendorSettings('vendor_webhook_endpoint', null, null, $vendorId))) {
             try {
-                Http::post($vendorWebhookEndpoint, $payload);//->throw();
+                Http::post($vendorWebhookEndpoint, $payload); //->throw();
             } catch (\Throwable $th) {
                 // __logDebug('Webhook error:');
                 // __logDebug($th->getMessage());
@@ -1836,13 +1887,15 @@ if (! function_exists('setRedirectAlertMessage')) {
 }
 
 if (! function_exists('swaksharyipadtalni')) {
-    function swaksharyipadtalni() {
+    function swaksharyipadtalni()
+    {
         return (getAppSettings(base64_decode('cHJvZHVjdF9yZWdpc3RyYXRpb24='), base64_decode('cmVnaXN0cmF0aW9uX2lk')) and (sha1(array_get($_SERVER, base64_decode('SFRUUF9IT1NU'), '') . getAppSettings(base64_decode('cHJvZHVjdF9yZWdpc3RyYXRpb24='), base64_decode('cmVnaXN0cmF0aW9uX2lk')) . base64_decode('NC41Kw==')) === getAppSettings(base64_decode('cHJvZHVjdF9yZWdpc3RyYXRpb24='), base64_decode('c2lnbmF0dXJl'))));
     }
 }
 if (! function_exists('swaksharyipadtalniforadditionals')) {
-    function swaksharyipadtalniforadditionals($item) {
-        $forItem = 'l'.'w'.'A'.'d'.'d'.'o'.'n'.$item;
+    function swaksharyipadtalniforadditionals($item)
+    {
+        $forItem = 'l' . 'w' . 'A' . 'd' . 'd' . 'o' . 'n' . $item;
         return (getAppSettings($forItem, base64_decode('cmVnaXN0cmF0aW9uX2lk')) and (sha1(array_get($_SERVER, base64_decode('SFRUUF9IT1NU'), '') . getAppSettings($forItem, base64_decode('cmVnaXN0cmF0aW9uX2lk')) . base64_decode('MS4wKw==')) === getAppSettings($forItem, base64_decode('c2lnbmF0dXJl'))));
     }
 }
@@ -1916,18 +1969,18 @@ if (! function_exists('getDemoNumbersForTest')) {
     function getDemoNumbersForTest($checkThisNumber = null, $returnString = false, $ignoreTestContact = false)
     {
         $demoAccountTestPhoneNumbers = [];
-        if(!$ignoreTestContact) {
+        if (!$ignoreTestContact) {
             $demoAccountTestPhoneNumbers = [
                 config('__misc.demo_test_recipient_contact_number')
             ];
         }
         $collectedNumbers = [];
-        if(isMobileAppRequest()) {
+        if (isMobileAppRequest()) {
             $numbers = array_unique(array_filter(explode(',', request()->demo_phone_numbers)));
-            if($numbers) {
+            if ($numbers) {
                 foreach ($numbers as $phoneNumber) {
                     $numLength = strlen((string) $phoneNumber);
-                    if(!is_numeric($phoneNumber) or $numLength < 9) {
+                    if (!is_numeric($phoneNumber) or $numLength < 9) {
                         continue;
                     }
                     $collectedNumbers[] = ltrim((string) ltrim((string) $phoneNumber, '+'), '0');
@@ -1936,10 +1989,10 @@ if (! function_exists('getDemoNumbersForTest')) {
         }
 
         $demoAccountTestPhoneNumbers = array_unique(array_filter(array_merge($demoAccountTestPhoneNumbers, session('__demoAccountTestPhoneNumbers') ?: [], $collectedNumbers)));
-        if($checkThisNumber) {
+        if ($checkThisNumber) {
             return in_array($checkThisNumber, $demoAccountTestPhoneNumbers);
         }
-        if($returnString) {
+        if ($returnString) {
             return implode(',', $demoAccountTestPhoneNumbers);
         }
         return $demoAccountTestPhoneNumbers;
@@ -1952,7 +2005,8 @@ if (! function_exists('whatsAppServiceEngine')) {
      *
      * @return \App\Yantrana\Components\WhatsAppService\WhatsAppServiceEngine
      */
-    function whatsAppServiceEngine() {
+    function whatsAppServiceEngine()
+    {
         return app()->make(\App\Yantrana\Components\WhatsAppService\WhatsAppServiceEngine::class);
     }
 }
@@ -1963,17 +2017,62 @@ if (! function_exists('getUserAppTheme')) {
      *
      * @return \App\Yantrana\Components\WhatsAppService\WhatsAppServiceEngine
      */
-    function getUserAppTheme() {
+    function getUserAppTheme()
+    {
         $themeOptions = configItem('theme_options');
-        $appTheme ='';
+        $appTheme = '';
         // Check if theme changes are allowed and if a custom theme exists in the session
         if (getAppSettings('allow_to_change_theme') and session()->has('users_current_app_theme')) {
             $appTheme = session('users_current_app_theme');
-        } 
-        if(!(getAppSettings('allow_to_change_theme')) or ! $appTheme ){
-         // Default theme from settings
-         $appTheme = getAppSettings('current_app_theme');
         }
-            return $appTheme;
+        if (!(getAppSettings('allow_to_change_theme')) or ! $appTheme) {
+            // Default theme from settings
+            $appTheme = getAppSettings('current_app_theme');
+        }
+        return $appTheme;
+    }
+}
+if (! function_exists('logSystemVendorChatMessage')) {
+    /**
+     * Log System message in vendor chat
+     *
+     * @param eloquent $contact
+     * @param string $action
+     * @param string $dynamicTitle
+     * @return eloquent|bool
+     */
+    function logSystemVendorChatMessage($contact, $action, $dynamicTitle)
+    {
+        return storeWhatsAppLogChatHistory([
+            'status' => 'initialize',
+            'contacts__id' => $contact->_id,
+            'vendors__id' => $contact->vendors__id,
+            'contact_wa_id' => $contact->wa_id,
+            'is_system_message' => 1,
+            'is_incoming_message' => 0,
+            'messaged_at' => now(),
+            '__data' => [
+                'system_message_data' => [
+                    'action' => $action,
+                    'dynamicKey' => '__dynamicTitle__',
+                    'dynamicValue' => $dynamicTitle
+                ]
+            ]
+        ]);
+    }
+}
+
+// WhatsAppMessageLogRepository
+if (! function_exists('storeWhatsAppLogChatHistory')) {
+    /**
+     * Get WhatsApp Service Engine Instance
+     *
+     * @return \App\Yantrana\Components\WhatsAppService\WhatsAppServiceEngine
+     */
+    function storeWhatsAppLogChatHistory($inputData)
+    {
+        $whatsAppMessageLogRepository = new WhatsAppMessageLogRepository();
+
+        return $whatsAppMessageLogRepository->storeIt($inputData);
     }
 }

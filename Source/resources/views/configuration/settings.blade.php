@@ -14,6 +14,13 @@
     'description' => '',
     'class' => 'col-lg-7'
     ])
+    <style>
+        input[type="radio"] {
+    transform: scale(1.5); /* or 2 for larger */
+    margin-right: 8px;
+    margin-left: 8px;
+  }
+    </style>
     <?php $pageType = request()->pageType; ?>
     <div class="container-fluid">
        <div class="row">

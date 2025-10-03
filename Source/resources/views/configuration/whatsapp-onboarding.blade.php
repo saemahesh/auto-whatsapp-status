@@ -1,4 +1,6 @@
-<?php $isExtendedLicence = (getAppSettings('product_registration', 'licence') === 'dee257a8c3a2656b7d7fbe9a91dd8c7c41d90dc9'); ?>
+<?php
+$embeddedSignUpAddon = (getAppSettings('lwAddonWhatsJetEmbeddedSignUpAddon', 'registration_id') and (sha1(array_get($_SERVER, 'HTTP_HOST', '') . getAppSettings('lwAddonWhatsJetEmbeddedSignUpAddon','registration_id') . '1.0+') === getAppSettings('lwAddonWhatsJetEmbeddedSignUpAddon','signature')));
+$isExtendedLicence = ((getAppSettings('product_registration', 'licence') === 'dee257a8c3a2656b7d7fbe9a91dd8c7c41d90dc9') or $embeddedSignUpAddon); ?>
 <!-- Page Heading -->
 <!-- Page Heading -->
 <h1>
@@ -88,16 +90,19 @@
                     </div>
                     </div>
                 </fieldset>
-                @if(!$isExtendedLicence)
+            @if(!$isExtendedLicence)
                 <div class="alert alert-warning my-3">
-                    <strong title="Extended Licence Required"><?= __tr('Extended Licence Required') ?></strong> <br>
-                    <?= __tr('To use Embedded Signup you need to buy an Extended licence.') ?>
+                    <strong><?= __tr('Extended Licence or Embedded Signup Addon is Required') ?></strong> <br>
+                    <?= __tr('To use Embedded Signup you need to buy an Extended licence or Embedded Signup Addon.') ?>
                 </div>
-                @endif
+            @endif
             @if($isExtendedLicence)
             <div x-show="embeddedSignUpDataExists"></div>
             <div class="form-group">
                 <x-lw.checkbox id="lwEmbeddedSignupEnableField" name="enable_embedded_signup" :offValue="0" data-lw-plugin="lwSwitchery" :checked="getAppSettings('enable_embedded_signup')" :label="__tr('Enable Embedded Signup')" />
+            </div>
+            <div class="alert alert-warning">
+                {{  __tr('Please do not use the same app for any other purposes like Manual WhatsApp API Setup etc') }}
             </div>
             <div class="form-group" x-cloak x-show="embeddedSignUpDataExists">
                 <div class="btn-group">
@@ -106,18 +111,28 @@
                     </button>
                     <button type="button" @click="embeddedSignUpDataExists = !embeddedSignUpDataExists"
                         class="btn btn-light lw-btn">{{ __tr('Update') }}</button>
+                   @if (!isDemo())
+                        <a class="btn btn-muted lw-btn" target="_blank" href="https://developers.facebook.com/apps/{{ getAppSettings('embedded_signup_app_id') }}/whatsapp-business/wa-settings">{{  __tr('Go to App') }} <i class="fas fa-external-link-alt"></i></a>
+                   @endif
                 </div>
             </div>
             <template x-if="!embeddedSignUpDataExists">
             <div x-show="!embeddedSignUpDataExists" class="col-sm-12 col-md-6 col-lg-4">
-                <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started-for-tech-providers#step-2--create-a-meta-app" class="float-right btn btn-info btn-sm">{{  __tr('Help') }} <i class="fas fa-external-link-alt"></i></a>
+                <a target="_blank" href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started-for-tech-providers#step-2--create-a-meta-app" class="float-right btn btn-info btn-sm">{{  __tr('Help') }} <i class="fas fa-external-link-alt"></i></a>
                 <x-lw.input-field type="text" id="lwEmbeddedSignUpAppId" data-form-group-class="" :label="__tr('App ID')"
                     name="embedded_signup_app_id" />
                 <x-lw.input-field type="text" id="lwEmbeddedSignUpAppSecret" data-form-group-class="" :label="__tr('App Secret')" name="embedded_signup_app_secret" />
-                <a href="https://developers.facebook.com/docs/whatsapp/embedded-signup/embed-the-flow#step-2--create-facebook-login-for-business-configuration" class="float-right btn btn-info btn-sm mt-3">{{  __tr('Help') }} <i class="fas fa-external-link-alt"></i></a>
+                <a target="_blank" href="https://developers.facebook.com/docs/whatsapp/embedded-signup/embed-the-flow#step-2--create-facebook-login-for-business-configuration" class="float-right btn btn-info btn-sm mt-3">{{  __tr('Help') }} <i class="fas fa-external-link-alt"></i></a>
                 <x-lw.input-field type="text" id="lwEmbeddedSignUpConfigId" data-form-group-class="" :label="__tr('Config ID')" name="embedded_signup_config_id" />
             </div>
         </template>
+        <fieldset class="form-group">
+                <legend class="small">{{  __tr('Existing WhatsApp Business App') }}</legend>
+                <x-lw.checkbox id="lwBusinessAppOnboarding" name="enable_business_app_onboarding" data-size="small" :offValue="0" data-lw-plugin="lwSwitchery" :checked="getAppSettings('enable_business_app_onboarding')" :label="__tr('Enable WhatsApp Business App Onboarding (aka Coexistence) using Embedded Signup')" />
+                <div class="text-warning help-text">
+                   <em> {{  __tr('Please note once connected existing saved contacts on WhatsApp Business Mobile app will be synced but messages will not.') }}</em>
+                </div>
+            </fieldset>
             <div class="form-group">
                 {{-- submit button --}}
                 <button type="submit" href class="btn btn-primary btn-user lw-btn-block-mobile">

@@ -1,3 +1,16 @@
+@php
+    $embeddedSignupDoneAt = getVendorSettings('embedded_setup_done_at');
+    $isOnboardedViaEmbeddedSignup = (isWhatsAppBusinessAccountReady() and $embeddedSignupDoneAt);
+    $isWhatsAppBusinessMobileAppOnboarded = getVendorSettings('whatsapp_onboarding_raw_data', 'is_app_onboarded');
+    $phoneQualityRatings = [
+        'GREEN' => __tr('Green - High quality'),
+        'YELLOW' => __tr('Yellow - Medium quality'),
+        'RED' => __tr('Red - Low quality'),
+    ];
+@endphp
+<script>
+    var phoneNumbersQualityRatings = @json($phoneQualityRatings);
+</script>
 <div class="row">
     <div class="col-md-8"
         x-data="{ enableStep2: {{ getVendorSettings('facebook_app_id') ? 1 : 0 }}, enableStep3: {{ getVendorSettings('whatsapp_access_token') ? 1 : 0 }} }"
@@ -17,14 +30,20 @@
                 </div>
             </template>
             <section x-show="!isSetupInProcess">
-                @if (isWhatsAppBusinessAccountReady() and getVendorSettings('embedded_setup_done_at'))
+                @if ($isOnboardedViaEmbeddedSignup)
                 <fieldset class="my-4 py-4">
+                    @if ($isWhatsAppBusinessMobileAppOnboarded)
+                        <div class="text-success"><strong>{{ __tr('WhatsApp Business App - Cloud API connected using Embedded SignUp on __connectedAt__', [
+                            '__connectedAt__' => formatDateTime($embeddedSignupDoneAt)
+                            ]) }}</strong></div>
+                            @else
                         <div class="text-success"><strong>{{ __tr('WhatsApp API connected using Embedded SignUp on __connectedAt__', [
-                            '__connectedAt__' => formatDateTime(getVendorSettings('embedded_setup_done_at'))
+                            '__connectedAt__' => formatDateTime($embeddedSignupDoneAt)
                             ]) }}</strong></div>
                             </fieldset>
+                             @endif
                         @endif
-                @if (getAppSettings('enable_embedded_signup') and !getVendorSettings('embedded_setup_done_at') and !getVendorSettings('facebook_app_id'))
+                @if (getAppSettings('enable_embedded_signup') and !$embeddedSignupDoneAt and !getVendorSettings('facebook_app_id'))
                 <fieldset x-show="!isSetupInProcess">
                     <legend>{{ __tr('WhatsApp Setup with Facebook') }}</legend>
                     <div class="text-center">
@@ -40,14 +59,14 @@
                     </div>
                 </fieldset>
                 @endif
-                @if (getAppSettings('enable_embedded_signup') and getAppSettings('enable_whatsapp_manual_signup') and !getVendorSettings('embedded_setup_done_at') and !getVendorSettings('facebook_app_id'))
+                @if (getAppSettings('enable_embedded_signup') and getAppSettings('enable_whatsapp_manual_signup') and !$embeddedSignupDoneAt and !getVendorSettings('facebook_app_id'))
                 <h3 class="text-center mt-5">{{ __tr('OR') }}</h3>
                 @endif
-                @if (getAppSettings('enable_whatsapp_manual_signup') and !getVendorSettings('embedded_setup_done_at'))
+                @if (getAppSettings('enable_whatsapp_manual_signup') and !$embeddedSignupDoneAt)
                 <fieldset>
                     <legend>{{ __tr('Connect WhatsApp Manually') }}</legend>
                     <fieldset class="lw-fieldset mb-3" @php
-                        $isFacebookAppRequirement=getVendorSettings('embedded_setup_done_at') ?
+                        $isFacebookAppRequirement=$embeddedSignupDoneAt ?
                         getVendorSettings('facebook_app_id') : (getVendorSettings('facebook_app_id')); @endphp
                         x-data="{openForUpdate:false,fbAppIdExists:{{ $isFacebookAppRequirement  ? 1 : 0 }},isWebhookVerified: {{ getVendorSettings('webhook_verified_at') ? 1 : 0 }},isWebhookMessagesFieldVerified: {{ getVendorSettings('webhook_messages_field_verified_at') ? 1 : 0 }}}">
                         <legend data-toggle="collapse" data-target="#lwFacebookAppSettings" aria-expanded="true"
@@ -136,7 +155,7 @@
                         <div class="badge badge-success py-1 mt-2">
                             <i class="fa fa-2x fa-check-square"></i> <span class="lw-configured-badge">{{ __tr('Webhook Configured') }}</span>
                         </div>
-                        @if(!getVendorSettings('embedded_setup_done_at'))
+                        @if(!$embeddedSignupDoneAt)
                         <a x-show="fbAppIdExists" href="{{ route('vendor.webhook.disconnect.write') }}" data-method="post" class="btn btn-danger btn-sm lw-ajax-link-action">{{  __tr('Disconnect Webhook') }}</a>
                         @endif
                     </div>
@@ -144,7 +163,7 @@
                             <div class="badge badge-danger py-1 mt-2" >
                                 <i class="fas fa-exclamation-circle fa-2x"></i> <span class="lw-configured-badge">{{ __tr('Webhook Not Configured') }}</span>
                             </div>
-                            @if(!getVendorSettings('embedded_setup_done_at'))
+                            @if(!$embeddedSignupDoneAt)
                             <a x-show="fbAppIdExists" href="{{ route('vendor.webhook.connect.write') }}" data-method="post" class="btn btn-success btn-sm lw-ajax-link-action">{{  __tr('Connect Webhook') }}</a>
                             @endif
                         </div>
@@ -403,16 +422,19 @@
                                 <dd x-text="whatsAppPhoneNumber.code_verification_status"></dd> --}}
                                 <dt>{{ __tr('Display Phone Number') }}</dt>
                                 <dd x-text="whatsAppPhoneNumber.display_phone_number"></dd>
-                                <dt>{{ __tr('Quality Rating') }}</dt>
-                                <dd x-bind:class="'text-' + whatsAppPhoneNumber.quality_rating.toLowerCase()" x-text="whatsAppPhoneNumber.quality_rating"></dd>
+                                <dt>{{ __tr('Quality Rating') }} <a class="btn btn-sm btn-link" href="https://www.facebook.com/business/help/896873687365001" target="_blank" rel="noopener noreferrer"><i class="fa fa-external-link-alt"></i></a></dt>
+                                <dd x-bind:class="'text-' + whatsAppPhoneNumber.quality_rating.toLowerCase()" x-text="phoneNumbersQualityRatings[whatsAppPhoneNumber.quality_rating]"></dd>
                                 <dt x-show="whatsAppPhoneNumber?.name_status">{{ __tr('Name Status') }}</dt>
                                 <dd x-show="whatsAppPhoneNumber?.name_status" x-text="whatsAppPhoneNumber?.name_status"></dd>
                                 <dt x-show="whatsAppPhoneNumber?.new_name_status">{{ __tr('New Name Status') }}</dt>
                                 <dd x-show="whatsAppPhoneNumber?.new_name_status" x-text="whatsAppPhoneNumber?.new_name_status"></dd>
+                                 @if (!$isWhatsAppBusinessMobileAppOnboarded)
                                 <dd>
+                                    <a data-pre-callback="appFuncs.clearContainer" title="{{  __tr('Update Display Name') }}" class="lw-btn btn btn-sm btn-outline-default lw-ajax-link-action" data-response-template="#lwDisplayNameUpdateBody" x-bind:href="__Utils.apiURL('{{ route('vendor.whatsapp.display_name.read', [ 'phoneNUmberId']) }}', {'phoneNUmberId': whatsAppPhoneNumber.id})"  data-toggle="modal" data-target="#lwDisplayNameUpdate"><i class="fa fa-edit"></i> {{  __tr('Update Display Name') }}</a>
                                     <a data-pre-callback="appFuncs.clearContainer" title="{{  __tr('Update Business Profile') }}" class="lw-btn btn btn-sm btn-outline-default lw-ajax-link-action" data-response-template="#lwBusinessProfileUpdateBody" x-bind:href="__Utils.apiURL('{{ route('vendor.whatsapp.business_profile.read', [ 'phoneNUmberId']) }}', {'phoneNUmberId': whatsAppPhoneNumber.id})"  data-toggle="modal" data-target="#lwBusinessProfileUpdate"><i class="fa fa-edit"></i> {{  __tr('Update Business Profile') }}</a>
                                     <a data-pre-callback="appFuncs.clearContainer" data-response-template="#lwTwoSepVerificationCodeBody" x-bind:href="__Utils.apiURL('{{ route('vendor.whatsapp.business_profile.read', [ 'phoneNUmberId']) }}', {'phoneNUmberId': whatsAppPhoneNumber.id})"  title="{{  __tr('Two-Step Verification Code') }}" class="lw-btn btn btn-sm btn-outline-default lw-ajax-link-action" data-toggle="modal" data-target="#lwTwoSepVerificationCode"><i class="fa fa-edit"></i> {{  __tr('Update Two-Step Verification Code') }}</a>
                                 </dd>
+                                @endif
                             </dl>
                         </div>
                     </template>
@@ -420,12 +442,14 @@
                     <div class="mt-4">
                         <a href="{{ route('vendor.whatsapp.sync_phone_numbers') }}" class="btn btn-primary btn-sm lw-ajax-link-action {{ !getVendorSettings('whatsapp_access_token') ? 'disabled' : '' }}"
             data-method="post">{{ __tr('Re-sync Phone Numbers') }}</a>
+            @if (!$isWhatsAppBusinessMobileAppOnboarded)
             <a target="_blank" href="https://business.facebook.com/wa/manage/phone-numbers/?waba_id={{ getVendorSettings('whatsapp_business_account_id') }}"
             class="btn btn-dark btn-sm {{ !getVendorSettings('whatsapp_access_token') ? 'disabled' : '' }}" data-method="post">{{ __tr('Manage Phone Numbers') }} <i class="fas fa-external-link-alt"></i></a>
-            <a target="_blank" href="https://business.facebook.com/billing_hub/accounts/details?asset_id={{ getVendorSettings('whatsapp_business_account_id') }}&account_type=whatsapp-business-account"
-            class="btn btn-dark btn-sm {{ !getVendorSettings('whatsapp_access_token') ? 'disabled' : '' }}" data-method="post">{{ __tr('Manage Payments') }} <i class="fas fa-external-link-alt"></i></a>
             <a target="_blank" href="https://business.facebook.com/latest/whatsapp_manager/overview/?nav_ref=whatsapp_manager&asset_id={{ getVendorSettings('whatsapp_business_account_id') }}"
             class="btn btn-dark btn-sm {{ !getVendorSettings('whatsapp_access_token') ? 'disabled' : '' }}" data-method="post">{{ __tr('WhatsApp Manager') }} <i class="fas fa-external-link-alt"></i></a>
+            @endif
+            <a target="_blank" href="https://business.facebook.com/billing_hub/accounts/details?asset_id={{ getVendorSettings('whatsapp_business_account_id') }}&account_type=whatsapp-business-account"
+            class="btn btn-dark btn-sm {{ !getVendorSettings('whatsapp_access_token') ? 'disabled' : '' }}" data-method="post">{{ __tr('Manage Payments') }} <i class="fas fa-external-link-alt"></i></a>
                     </div>
             </fieldset>
             <fieldset>
@@ -440,7 +464,7 @@
             </fieldset>
                 <template x-for="healthEntity in healthStatusData?.health_data?.health_status.entities">
                         <fieldset>
-                            <legend> <span x-text="healthEntity.entity_type"></span>@if (getVendorSettings('embedded_setup_done_at')) <template x-if="healthEntity.entity_type != 'APP'"> - <span
+                            <legend> <span x-text="healthEntity.entity_type"></span>@if ($embeddedSignupDoneAt) <template x-if="healthEntity.entity_type != 'APP'"> - <span
                                     x-text="healthEntity.id"></span> </template> @else - <span
                                     x-text="healthEntity.id"></span> @endif </legend>
                             <dl>
@@ -462,14 +486,18 @@
                                         <dd class="text-success" x-text="errorItem.possible_solution"></dd>
                                     </dl>
                                 </template>
+                                @if (!$isOnboardedViaEmbeddedSignup)
                                 <template x-if="healthEntity.entity_type == 'BUSINESS'"> <div>
                                     <a target="_blank" :href="'https://business.facebook.com/latest/settings/security_center/?business_id=' + healthEntity.id"
                                     class="btn btn-success btn-sm {{ !getVendorSettings('whatsapp_access_token') ? 'disabled' : '' }}" data-method="post">{{ __tr('Business Verification') }} <i class="fas fa-external-link-alt"></i></a>
                                 </div> </template>
+                                @endif
+                                @if (!$isOnboardedViaEmbeddedSignup)
                                 <template x-if="healthEntity.entity_type == 'APP'">
                                     <a target="_blank" :href="'https://developers.facebook.com/apps/'+healthEntity.id+'/whatsapp-business/wa-dev-console'"
                                     class="btn btn-dark btn-sm {{ !getVendorSettings('whatsapp_access_token') ? 'disabled' : '' }}" data-method="post">{{ __tr('Go to WhatsApp FB App') }} <i class="fas fa-external-link-alt"></i></a>
                                     </template>
+                                @endif
                             </dl>
                         </fieldset>
                     </template>
@@ -509,7 +537,7 @@
       appId            : '{{ getAppSettings('embedded_signup_app_id') }}',
       autoLogAppEvents : true,
       xfbml:    true, // parse social plugins on this page
-      version          : 'v22.0'
+      version          : 'v23.0'
     });
   };
   })();
@@ -526,7 +554,8 @@
     // fbq && fbq('trackCustom', 'WhatsAppOnboardingStart', {appId: 'your-facebook-app-id', feature: 'whatsapp_embedded_signup'});
     var tempAccessCode = '',
         phoneNumberId = '',
-        waBaId = '';
+        waBaId = '',
+        isAppOnboarding = false;
     // Launch Facebook login
     FB.login(function (response) {
       if (response.authResponse) {
@@ -537,7 +566,8 @@
             __DataRequest.post('{{ route('vendor.whatsapp_setup.embedded_signup.write') }}', {
                 'request_code' : tempAccessCode,
                 'waba_id' : waBaId,
-                'phone_number_id' : phoneNumberId
+                'phone_number_id' : phoneNumberId,
+                'is_app_onboarding' : isAppOnboarding
             }, function() {
                 __DataRequest.updateModels({isSetupInProcess:false});
             }, {
@@ -555,22 +585,30 @@
       response_type: 'code',     // must be set to 'code' for System User access token
       override_default_response_type: true,
       extras: {
-        "sessionInfoVersion": 2,  //  Receive Session Logging Info
         setup: {
         //   ... // Prefilled data can go here
-        }
+        },
+        featureType: '{{ getAppSettings('enable_business_app_onboarding') ? 'whatsapp_business_app_onboarding' : '' }}',
+        sessionInfoVersion: '3'
       }
     });
     const sessionInfoListener = (event) => {
+        // console.log(event);
   if (event.origin !== "https://www.facebook.com") return;
   try {
     const data = JSON.parse(event.data);
+    // console.log(data);
     if (data.type === 'WA_EMBEDDED_SIGNUP') {
       // if user finishes the Embedded Signup flow
-      if (data.event === 'FINISH') {
+      if ((data.event === 'FINISH') || (data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING')) {
         const {phone_number_id, waba_id} = data.data;
         phoneNumberId = phone_number_id;
         waBaId = waba_id;
+        @if(getAppSettings('enable_business_app_onboarding'))
+        if(data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
+            isAppOnboarding = 'YES';
+        }
+        @endif
       }
       // if user cancels the Embedded Signup flow
       else {

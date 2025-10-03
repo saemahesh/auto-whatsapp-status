@@ -1,6 +1,72 @@
 <div class="lw-whatsapp-preview-container">
     <img class="lw-whatsapp-preview-bg" src="{{ asset('imgs/wa-message-bg.png') }}" alt="">
     <div class="lw-whatsapp-preview">
+        @if(!__isEmpty($carouselTemplateData))
+            <div class="card">
+                <div class="lw-whatsapp-body">
+                    @php
+                        $exampleBodyItems = [
+                        "\n" => '<br>',
+                        ];
+                    @endphp
+                    <?= formatWhatsAppText(strtr($carouselTemplateData[0]['text'], $exampleBodyItems)) ?>
+                </div>
+            </div>
+            <div class="lw-carousel-wrapper">
+                <button type="button" class="lw-carousel-arrow prev" onclick="scrollSlide(this, false)">‹</button>
+                <div class="lw-carousel-container">
+                    @foreach ($carouselTemplateData[1]['cards'] as $cardIndex => $cardItem)
+                        <div class="lw-carousel-card">
+                            @if($cardItem['components'][0]['type'] == 'HEADER')
+                                <div class="lw-card-media">
+                                    @if($cardItem['components'][0]['format'] == 'IMAGE')
+                                        <i class="fa fa-5x fa-image text-white"></i>
+                                    @endif
+                                    @if($cardItem['components'][0]['format'] == 'VIDEO')
+                                        <i class="fa fa-5x fa-play-circle text-white"></i>
+                                    @endif                                
+                                </div>
+                            @endif
+                            @if($cardItem['components'][1]['type'] == 'BODY')
+                                <div class="lw-carousel-card-body">
+                                    <div class="lw-card-desc lw-ws-pre-line">
+                                        @php
+                                            $exampleBodyItems = [
+                                            "\n" => '<br>',
+                                            ];
+                                        @endphp
+                                        <?= formatWhatsAppText(strtr($carouselTemplateData[0]['text'], $exampleBodyItems)) ?>
+                                    </div>
+                                </div>
+                            @endif
+                            <div class="card-footer lw-whatsapp-buttons">
+                                <div class="list-group list-group-flush lw-whatsapp-buttons">
+                                    @if($cardItem['components'][2]['type'] == 'BUTTONS')
+                                        @foreach($cardItem['components'][2]['buttons'] as $buttonIndex => $button)
+                                            <div>
+                                                <div class="list-group-item">
+                                                    @if($button['type'] == 'QUICK_REPLY')
+                                                        <i class="fa fa-reply"></i>
+                                                    @endif
+                                                    @if($button['type'] == 'PHONE_NUMBER')
+                                                        <i class="fa fa-phone-alt"></i>
+                                                    @endif
+                                                    @if($button['type'] == 'URL')
+                                                        <i class="fas fa-external-link-square-alt"></i>
+                                                    @endif
+                                                    <span>{{ $button['text'] }}</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>                            
+                        </div>
+                    @endforeach
+                </div>
+                <button type="button" class="lw-carousel-arrow next" onclick="scrollSlide(this, true)">›</button>
+            </div>
+        @else
         <div class="card ">
             @foreach ($templateComponents as $templateComponent)
             @if ($templateComponent['type'] == 'HEADER')
@@ -85,5 +151,6 @@
             @endif
             @endforeach
         </div>
+        @endif
     </div>
 </div>

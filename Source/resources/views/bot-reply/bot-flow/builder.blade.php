@@ -57,6 +57,8 @@
                                         }}</button>
                                     <button type="button" @click="isAdvanceBot = 'interactive'" class="dropdown-item btn"
                                         data-toggle="modal" data-target="#lwAddNewAdvanceBotReply"> {{ __tr('Advance Interactive Bot Reply') }}</button>
+                                    <button type="button" @click="isAdvanceBot = 'template'" class="dropdown-item btn"
+                                        data-toggle="modal" data-target="#lwAddNewAdvanceBotReply"> {{ __tr('Template Bot Reply') }}</button>
                                 </div>
                             </div>
                         </template>

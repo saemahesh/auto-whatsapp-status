@@ -65,6 +65,7 @@ $planDetails = vendorPlanDetails(null, null, $vendorInfo['id']);
                 $planStructure = $planDetails->plan_id ? getPaidPlans($planDetails->plan_id) : getFreePlan();
                 $planCharges = $planStructure['charges'][$planDetails->frequency] ?? null;
                 @endphp
+                <?php if (!__isEmpty(data_get($planStructure, 'features'))) { ?>
                 @foreach ($planStructure['features'] as $featureKey => $featureValue)
                     @php
                          $structureFeatureValue = $featureValue;
@@ -92,6 +93,7 @@ $planDetails = vendorPlanDetails(null, null, $vendorInfo['id']);
                          @endif
                     </div>
                 @endforeach
+                <?php } ?>
                 <hr>
                 @if($planCharges)
                 <h2 class="text-blue">

@@ -1,4 +1,22 @@
 <?php
+/**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
 
 /**
  * HomeController.php - Controller file
@@ -23,6 +41,8 @@ use Endroid\QrCode\ErrorCorrectionLevel;
 use App\Yantrana\Components\Home\HomeEngine;
 use Endroid\QrCode\Writer\ValidationException;
 use App\Yantrana\Components\Page\PageEngine;
+use App\Yantrana\Components\WhatsAppService\WhatsAppServiceEngine;
+use App\Yantrana\Components\Contact\Repositories\ContactRepository;
 
 
 
@@ -36,6 +56,16 @@ class HomeController extends BaseController
      * @var PageEngine - Home Engine
      */
     protected $pageEngine;
+
+    /**
+     * @var WhatsAppServiceEngine - WhatsAppService Engine
+     */
+    protected $whatsAppServiceEngine;
+
+    /**
+     * @var ContactRepository - Contact Repository
+     */
+    protected $contactRepository;
   
     /**
      * Constructor
@@ -43,10 +73,12 @@ class HomeController extends BaseController
      * @param  HomeEngine  $homeEngine  - Home Engine
      * @return void
      *-----------------------------------------------------------------------*/
-    public function __construct(HomeEngine $homeEngine,PageEngine $pageEngine)
+    public function __construct(HomeEngine $homeEngine,PageEngine $pageEngine, WhatsAppServiceEngine $whatsAppServiceEngine, ContactRepository $contactRepository)
     {
         $this->homeEngine = $homeEngine;
         $this->pageEngine = $pageEngine;
+        $this->whatsAppServiceEngine = $whatsAppServiceEngine;
+        $this->contactRepository = $contactRepository;
     }
 
     public function homePageView()
@@ -188,6 +220,9 @@ class HomeController extends BaseController
                 'required',
             ]
         ]);
+        $demoTemplateUid = config('__misc.demo_template_uid');
+        $request->merge(['template_uid' => $demoTemplateUid]);
+
         $numbers = array_unique(array_filter(explode(',', $request->demo_phone_numbers)));
         $collectedNumbers = [];
         if($numbers) {
@@ -196,7 +231,31 @@ class HomeController extends BaseController
                 $numLength = strlen((string) $phoneNumber);
                 abortIf(($numLength < 9), 400, __tr('It should be minimum of 9 digits'));
 
-                $collectedNumbers[] = ltrim((string) ltrim((string) $phoneNumber, '+'), '0');
+                $phoneNumber = cleanDisplayPhoneNumber($phoneNumber);
+                $collectedNumbers[] = $phoneNumber;
+
+                // Set contact UID as null
+                $contactUid = null;
+
+                // Get contact from DB
+                $contactExists = $this->contactRepository->fetchIt([
+                    'wa_id' => $phoneNumber,
+                ]);
+
+                // Check if contact exists
+                if (__isEmpty($contactExists)) {
+                    $contact = $this->contactRepository->storeContact([
+                        'phone_number' => $phoneNumber,
+                    ]);
+
+                    $contactUid = $contact->_uid;
+                } else {
+                    $contactUid = $contactExists->_uid;
+                }
+                if($demoTemplateUid) {
+                    // Send Template message to newly added or existing contact
+                    $this->whatsAppServiceEngine->sendTemplateMessageProcess($request, $contactUid);
+                }
             }
         }
         session([

@@ -1,8 +1,27 @@
 <?php
 /**
-* WhatsAppConnectApiService.php -
-*
-*-----------------------------------------------------------------------------*/
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+
+/**
+ * WhatsAppConnectApiService.php -
+ *
+ *-----------------------------------------------------------------------------*/
 
 namespace App\Yantrana\Components\WhatsAppService\Services;
 
@@ -15,7 +34,7 @@ use App\Yantrana\Components\WhatsAppService\Interfaces\WhatsAppServiceEngineInte
 
 class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEngineInterface
 {
-    protected $baseApiRequestEndpoint = 'https://graph.facebook.com/v22.0/'; // Base Request endpoint
+    protected $baseApiRequestEndpoint = 'https://graph.facebook.com/v23.0/'; // Base Request endpoint
 
     protected $waAccountId; // WhatsApp Business Account ID
     protected $whatsAppPhoneNumberId; // Phone number ID
@@ -27,9 +46,7 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
      *
      * @return void
      *-----------------------------------------------------------------------*/
-    public function __construct(
-    ) {
-    }
+    public function __construct() {}
 
     /**
      * Configure settings based on vendor id
@@ -54,6 +71,7 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
         updateProgressTextModel(
             __tr('preparing ...')
         );
+        $isBusinessAppOnboarding = $request->is_app_onboarding === 'YES';
         $accessToken = null;
         $phoneNumberId = null;
         $wabaId = null;
@@ -62,10 +80,10 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
         // $phoneNumberId = '';
         // $wabaId = '';
         // simulate zone ends
-        if(!$wabaId) {
+        if (!$wabaId) {
             $wabaId = $request->waba_id;
         }
-        if(!$accessToken) {
+        if (!$accessToken) {
             updateProgressTextModel(
                 __tr('generating token ...')
             );
@@ -80,7 +98,7 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
         } else {
             $this->accessToken = $accessToken;
         }
-        if(!$phoneNumberId) {
+        if (!$phoneNumberId and !$isBusinessAppOnboarding) {
             updateProgressTextModel(
                 __tr('verifying phone number records ...')
             );
@@ -92,16 +110,16 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
                 return $value['id'] == $phoneNumberId;
             });
             // if the record not found we may need to register this
-            if($phoneNumberRecord['platform_type'] != 'CLOUD_API') {
+            if (($phoneNumberRecord['platform_type'] != 'CLOUD_API') or (isset($phoneNumberRecord['is_on_biz_app']) and ($phoneNumberRecord['is_on_biz_app'] != true))) {
                 updateProgressTextModel(
                     __tr('registering phone number ...')
                 );
                 // https://developers.facebook.com/docs/whatsapp/cloud-api/reference/registration
                 // DEVELOPER NOTE: to avoid number blocked for certain period as for testing multiple times, comment this line for a while
                 $phoneRegistration = $this->apiPostRequest("{$this->baseApiRequestEndpoint}/{$request->phone_number_id}/register", [
-                        'messaging_product' => 'whatsapp',
-                        'pin' => '123456',
-                    ]);
+                    'messaging_product' => 'whatsapp',
+                    'pin' => '123456',
+                ]);
                 abortIf((!$phoneRegistration['success'] ?? null), 402, __tr('Failed Phone number registration'));
                 updateProgressTextModel(
                     __tr('fetching updated phone number records ...')
@@ -112,8 +130,12 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
                     return $value['id'] == $phoneNumberId;
                 });
             }
+        } else if ($isBusinessAppOnboarding) {
+            // https://developers.facebook.com/docs/whatsapp/embedded-signup/manage-accounts/phone-numbers
+            $phoneNumbers = $this->getPhoneNumbers($wabaId);
+            $phoneNumberRecord = $phoneNumbers['data'][0] ?? null;
+            $phoneNumberId = $phoneNumberRecord['id'];
         }
-        // __logDebug('phoneNumbers', $phoneNumberRecord);
         $vendorUid = getVendorUid();
         $vendorId = getVendorId();
         updateProgressTextModel(
@@ -136,6 +158,17 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
         );
         // fetch existing records
         $webhookOverrides = $this->apiGetRequest("{$this->baseApiRequestEndpoint}{$wabaId}/subscribed_apps");
+        $contactsSyncRequestId = null;
+        if($isBusinessAppOnboarding) {
+            updateProgressTextModel(
+                __tr('requesting contacts ...')
+            );
+            $contactsSyncRequest = $this->apiPostRequest("{$this->baseApiRequestEndpoint}{$phoneNumberId}/smb_app_data", [
+                'messaging_product' => 'whatsapp',
+                'sync_type' => 'smb_app_state_sync'
+            ]);
+            $contactsSyncRequestId = $contactsSyncRequest['request_id'] ?? null;
+        }
         updateProgressTextModel(
             __tr('finalizing ...')
         );
@@ -153,6 +186,8 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
                 'waba_id' => $wabaId,
                 'phone_number_id' => $phoneNumberId,
                 'webhook_overrides' => $webhookOverrides,
+                'is_app_onboarded' => $isBusinessAppOnboarding,
+                'contacts_sync_request_id' => $contactsSyncRequestId,
             ]
         ];
         app()->make(\App\Yantrana\Components\Vendor\VendorSettingsEngine::class)->updateProcess('whatsapp_cloud_api_setup', $dataToUpdate, $vendorId);
@@ -175,10 +210,13 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
      */
     public function getPhoneNumbers($wabaId, $accessToken = null)
     {
-        if($accessToken) {
+        if ($accessToken) {
             $this->accessToken = $accessToken;
         }
-        return $this->apiGetRequest("{$this->baseApiRequestEndpoint}{$wabaId}/phone_numbers?fields=display_phone_number,certificate,name_status,new_certificate,new_name_status,last_onboarded_time", []) ?? null;
+        // return $this->apiGetRequest("{$this->baseApiRequestEndpoint}{$wabaId}/phone_numbers?fields=display_phone_number,certificate,name_status,new_certificate,new_name_status,last_onboarded_time", []) ?? null;
+        return $this->apiGetRequest("{$this->baseApiRequestEndpoint}{$wabaId}/phone_numbers", [
+            'fields' => 'id,cc,country_dial_code,display_phone_number,verified_name,status,quality_rating,search_visibility,platform_type,code_verification_status,name_status,new_name_status,last_onboarded_time,new_certificate'
+        ]) ?? null;
     }
 
     // as of now not in use
@@ -195,7 +233,7 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
     {
         // vendor webhook
         $webhookUrl = getViaSharedUrl(route('vendor.whatsapp_webhook', [
-           'vendorUid' => $vendorUid,
+            'vendorUid' => $vendorUid,
         ]));
         // https://developers.facebook.com/docs/whatsapp/embedded-signup/webhooks/override#delete-waba-alternate-callback
         $this->apiPostRequest("{$this->baseApiRequestEndpoint}{$wabaId}/subscribed_apps");
@@ -217,10 +255,10 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
      */
     public function removeExistingWebhooks($wabaId, $accessToken = null)
     {
-        if($accessToken) {
+        if ($accessToken) {
             $this->accessToken = $accessToken;
         }
-        if(!$this->accessToken) {
+        if (!$this->accessToken) {
             $this->accessToken = getVendorSettings('whatsapp_access_token');
         }
         // delete existing webhooks
@@ -244,7 +282,7 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
         ]));
         $subscriptions = $this->apiPostRequest("{$this->baseApiRequestEndpoint}" . $appId . "/subscriptions?access_token=" . $appId . "|" . $appSecret, [
             'object' => 'whatsapp_business_account',
-            'fields' => 'messages,message_template_quality_update,message_template_status_update,account_update',
+            'fields' => 'messages,message_template_quality_update,message_template_status_update,account_update,history,smb_app_state_sync,smb_message_echoes',
             'callback_url' => $webhookUrl,
             "verify_token" => sha1($vendorUid)
         ]);
@@ -257,16 +295,16 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
      * @param string $appSecret
      * @return array
      *
-     * @link https://developers.facebook.com/docs/graph-api/reference/v22.0/app/subscriptions#delete
+     * @link https://developers.facebook.com/docs/graph-api/reference/v23.0/app/subscriptions#delete
      */
     public function disconnectBaseWebhook($appId, $appSecret, $wabaId = null)
     {
-        if($wabaId) {
+        if ($wabaId) {
             $this->removeExistingWebhooks($wabaId);
         }
         return $this->apiDeleteRequest($appId . "/subscriptions?access_token=" . $appId . "|" . $appSecret, [
             'object' => 'whatsapp_business_account',
-            'fields' => 'messages,message_template_quality_update,message_template_status_update,account_update',
+            'fields' => 'messages,message_template_quality_update,message_template_status_update,account_update,history,smb_app_state_sync,smb_message_echoes',
         ]);
     }
 
@@ -340,14 +378,14 @@ class WhatsAppConnectApiService extends BaseEngine implements WhatsAppServiceEng
             $getContents = $response->getBody()->getContents();
             $getContentsDecoded = json_decode($getContents, true);
             $userMessage = Arr::get($getContentsDecoded, 'error.error_user_title', '') . ' '
-            . Arr::get($getContentsDecoded, 'error.message', '') . ' '
-            . Arr::get($getContentsDecoded, 'error.error_user_msg', '') . ' '
-            . Arr::get($getContentsDecoded, 'error.error_data.details');
-            if(!$userMessage) {
+                . Arr::get($getContentsDecoded, 'error.message', '') . ' '
+                . Arr::get($getContentsDecoded, 'error.error_user_msg', '') . ' '
+                . Arr::get($getContentsDecoded, 'error.error_data.details');
+            if (!$userMessage) {
                 $userMessage = $e->getMessage();
             }
             // __logDebug($userMessage);
-            if(!ignoreFacebookApiError()) {
+            if (!ignoreFacebookApiError()) {
                 // stop and response back for error if any
                 abortIf(
                     true,

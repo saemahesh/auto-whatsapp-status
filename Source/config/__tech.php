@@ -50,6 +50,7 @@ $techAppConfig = [
         'cancelled' => __tr('Cancelled'),
         'pending' => __tr('Pending'),
         'initiated' => __tr('Initiated'),
+        'canceled' => __tr('Cancelled'), // managed to translation status for subscription table
     ],
     'subscription_methods' => [
         'auto' => __tr('Auto'),
@@ -85,7 +86,10 @@ $techAppConfig = [
         // status codes in which the amounts get debited from system transaction
         // if it already paid if any
         'debit_status_codes' => [
-            1, 3, 4, 5,
+            1,
+            3,
+            4,
+            5,
         ],
         'payment_checkout_modes' => [
             1 => __tr('Test'),
@@ -97,7 +101,7 @@ $techAppConfig = [
         "production" => "https://api-m.paypal.com",
         "sandbox" => "https://api-m.sandbox.paypal.com",
     ],
-    
+
     /**
      * Make sure you find the items like {language_code} and add the newly added values
      */
@@ -251,8 +255,23 @@ $techAppConfig = [
         1 => __tr('In Queue'),
         2 => __tr('Failed'),
         3 => __tr('Processing'),
-        4 => __tr('Processed & Waiting for Response'),
+        4 => __tr('Processed'),
+        5 => __tr('Expired'),
+        6 => __tr('Processed but Response Awaited'),
+        7 => __tr('Aborted'),
     ],
+    // Chat history string messages
+    'system_message_actions' => [
+        'ASSIGN_TEAM_MEMBER' => __tr('Assigned __dynamicTitle__ as a Team Member.'),
+        'UNASSIGN_TEAM_MEMBER' => __tr('Team member unassigned.'),
+        'LABEL_ADDED' => __tr('__dynamicTitle__ label added to this chat.'),
+        'LABEL_REMOVED' => __tr('__dynamicTitle__ label deleted from this chat.'),
+        'ENABLE_AI_BOT' => __tr('Enabled AI Bot for this chat.'),
+        'ENABLE_REPLY_BOT' => __tr('Enabled Reply Bot for this chat.'),
+        'DISABLE_AI_BOT' => __tr('Disable AI Bot for this chat.'),
+        'DISABLE_REPLY_BOT' => __tr('Disable Reply Bot for this chat.'),
+        'ERROR' => __tr('__dynamicTitle__'),
+    ]
 ];
 
 $appTechConfig = [];

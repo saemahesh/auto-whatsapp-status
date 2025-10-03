@@ -9,7 +9,10 @@ return [
         env('MAIL_FROM_ADD', 'your@domain.com'),
         env('MAIL_FROM_NAME', 'E-Mail Service'),
     ],
+    // development mode
+    'ngrok_url' => env('NGROK_URL', ''),
     // demos
     'demo_protected_bots' => env('DEMO_PROTECTED_BOTS', ''),
     'demo_test_recipient_contact_number' => env('DEMO_TEST_RECIPIENT_CONTACT_NUMBER', ''),
+    'demo_template_uid' =>  env('DEMO_TEMPLATE_UID', 0)
 ];

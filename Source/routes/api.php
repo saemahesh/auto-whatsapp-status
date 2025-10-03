@@ -52,6 +52,11 @@ Route::group([
         WhatsAppServiceController::class,
         'apiSendTemplateChatMessage',
     ])->name('api.vendor.chat_template_message.send.process');
+    // send interactive message
+    Route::post('/contact/send-interactive-message', [
+        WhatsAppServiceController::class,
+        'apiSendInteractiveChatMessage',
+    ])->name('api.vendor.chat_message_interactive.send.process');
     // create new contact
     Route::post('/contact/create', [
         ContactController::class,
@@ -62,11 +67,27 @@ Route::group([
         ContactController::class,
         'apiProcessContactUpdate',
     ])->name('api.vendor.contact.update.process');
-     
+    // assign team member
+    Route::post('/contact/assign-team-member', [
+        ContactController::class,
+        'apiAssignTeamMemberToContact',
+    ])->name('api.vendor.contact.assign_member.update.process');
 });
 
 // Mobile app apis
 Route::group(['middleware' => 'guest'], function () {
+
+     //vendor registration
+    Route::post('/register/vendor', [
+        AuthController::class,
+        'register',
+    ])->name('api.auth.register.process');
+     //vendor activation
+    Route::post('/register/vendor/activation', [
+        AuthController::class,
+        'activationRequiredRegister',
+    ])->name('api.activation_required.auth.register.process');
+
     Route::group([
         'prefix' => 'user',
     ], function () {
@@ -138,37 +159,57 @@ Route::group([
             'sendChatMessage',
         ])->name('app_api.vendor.chat_message.send.process');
 
-         // Contact get labels and team members data
-         Route::get('/whatsapp/contact/chat-box-data/{contactUid}', [
+        // Contact get labels and team members data
+        Route::get('/whatsapp/contact/chat-box-data/{contactUid}', [
             ContactController::class,
             'getLabelsForApi',
         ])->name('app_api.chat.box.base.data');
             // Contact get the data
-            Route::get('/contacts/{contactIdOrUid}/get-update-data', [
-                ContactController::class,
-                'updateContactData',
-            ])->name('app_api.vendor.contact.read.update.data');
-            //media type api
-            Route::get('/whatsapp/contact/chat/prepare-send-media/{mediaType?}', [
-                WhatsAppServiceController::class,
-                'prepareSendMediaUploader',
-            ])->name('app_api.vendor.chat_message_media.upload.prepare');
-            Route::post('/whatsapp/contact/chat/send-media', [
-                WhatsAppServiceController::class,
-                'sendChatMessageMedia',
-            ])->name('app_api.vendor.chat_message_media.send.process');
-            Route::post('/whatsapp/contact/chat/update-notes', [
-                ContactController::class,
-                'updateNotes',
-            ])->name('app_api.vendor.chat.update_notes.process');
-            Route::post('/whatsapp/contact/chat/assign-user', [
-                ContactController::class,
-                'assignChatUser',
-            ])->name('app_api.vendor.chat.assign_user.process');
-            Route::post('/whatsapp/contact/chat/assign-labels', [
-                ContactController::class,
-                'assignContactLabels',
-            ])->name('app_api.vendor.chat.assign_labels.process');
+        Route::get('/contacts/{contactIdOrUid}/get-update-data', [
+            ContactController::class,
+            'updateContactData',
+        ])->name('app_api.vendor.contact.read.update.data');
+        //media type api
+        Route::get('/whatsapp/contact/chat/prepare-send-media/{mediaType?}', [
+            WhatsAppServiceController::class,
+            'prepareSendMediaUploader',
+        ])->name('app_api.vendor.chat_message_media.upload.prepare');
+        Route::post('/whatsapp/contact/chat/send-media', [
+            WhatsAppServiceController::class,
+            'sendChatMessageMedia',
+        ])->name('app_api.vendor.chat_message_media.send.process');
+        Route::post('/whatsapp/contact/chat/update-notes', [
+            ContactController::class,
+            'updateNotes',
+        ])->name('app_api.vendor.chat.update_notes.process');
+        Route::post('/whatsapp/contact/chat/assign-user', [
+            ContactController::class,
+            'assignChatUser',
+        ])->name('app_api.vendor.chat.assign_user.process');
+        Route::post('/whatsapp/contact/chat/assign-labels', [
+            ContactController::class,
+            'assignContactLabels',
+        ])->name('app_api.vendor.chat.assign_labels.process');
+        //clear chat history
+        Route::post('/whatsapp/contact/chat/clear-history/{contactUid}', [
+            WhatsAppServiceController::class,
+            'clearChatHistory',
+        ])->name('app_api.vendor.chat_message.delete.process');
+            //create whatsapp contact label
+         Route::post('/whatsapp/contact/create-label', [
+            ContactController::class,
+            'createLabel',
+        ])->name('app_api.vendor.chat.label.create.write');
+        //whatsapp contact edit lable
+            Route::post('/whatsapp/contact/chat/edit-label', [
+            ContactController::class,
+            'updateLabel',
+        ])->name('app_api.vendor.chat.label.update.write');
+            //whatsapp contact delete lable
+            Route::post('/whatsapp/contact/chat/delete-label/{labelUid}', [
+            ContactController::class,
+            'deleteLabelProcess',
+        ])->name('app_api.vendor.chat.label.delete.write');
            
     });
     // logout
@@ -186,17 +227,7 @@ Route::group([
         UserController::class,
         'updateProfile',
     ])->name('api.user.profile.update');
-    //vendor registration
-    Route::post('/register/vendor', [
-        AuthController::class,
-        'register',
-    ])->name('api.auth.register.process');
-     //vendor activation
-    Route::post('/register/vendor/activation', [
-        AuthController::class,
-        'activationRequiredRegister',
-    ])->name('api.activation_required.auth.register.process');
-
+   
     // Account Activation
     Route::get('/{userUid}/account-activation', [
         AuthController::class,

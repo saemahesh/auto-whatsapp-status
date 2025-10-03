@@ -24,10 +24,18 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         if (!getAppSettings('enable_queue_jobs_for_campaigns')) {
-            // synchronous calling
-            $schedule->call(function () {
-                return app()->make(\App\Yantrana\Components\WhatsAppService\WhatsAppServiceEngine::class)->processCampaignSchedule();
-            })->everyFiveSeconds();
+            $schedule->command('whatsapp:campaign:process')
+            ->everyFiveSeconds()
+            ->name('process_messages_via_cron')
+            ->withoutOverlapping(3) // Prevent overlapping executions
+            ;
+            if(getAppSettings('enable_wa_webhook_process_using_db')) {
+                $schedule->command('whatsapp:webhooks:process')
+                ->everySecond()
+                ->name('process_webhooks_via_cron')
+                ->withoutOverlapping(1) // Prevent overlapping executions
+                ;
+            }
         }
     }
 

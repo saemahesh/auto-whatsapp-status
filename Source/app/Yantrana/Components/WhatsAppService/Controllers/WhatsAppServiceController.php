@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * WhatsAppServiceController.php - Controller file
 *
 * This file is part of the WhatsAppService component.
@@ -111,6 +129,8 @@ class WhatsAppServiceController extends BaseController
             'timezone' => 'required',
             'title' => 'required',
             'contact_labels' => 'array',
+            'schedule_at' => 'nullable|date',
+            'expire_at' => 'nullable|date|after:schedule_at'
         ]);
         $processReaction = $this->whatsAppServiceEngine->processCampaignCreate($request);
 
@@ -257,6 +277,84 @@ class WhatsAppServiceController extends BaseController
         ]);
         // send message
         $processReaction = $this->whatsAppServiceEngine->processSendChatMessage($request, true);
+        // processed data
+        $processedData = $processReaction->data();
+        // get back the response
+        return $this->processApiResponse($processReaction, [
+            'log_uid' => $processedData['log_message']['_uid'] ?? null,
+            'contact_uid' => $processedData['contact']['_uid'] ?? null,
+            'phone_number' => $processedData['log_message']['contact_wa_id'] ?? null,
+            'wamid' => $processedData['log_message']['wamid'] ?? null,
+            'status' => $processedData['log_message']['status'] ?? null,
+        ]);
+    }
+
+    /**
+     * Send Chat Interactive Based Chat Message
+     *
+     * @param BaseRequestTwo $request
+     * @since - 2.0.0
+     *
+     * @return json
+     */
+    public function apiSendInteractiveChatMessage(BaseRequestTwo $request)
+    {
+        $this->apiAccessAllowedOrAbort();
+        validateVendorAccess('messaging');
+        // check if account failed
+        if(!isWhatsAppBusinessAccountReady()) {
+            return $this->processApiResponse([
+                'result' => 'failed',
+                'message' => 'Please complete your WhatsApp Cloud API Setup first',
+            ]);
+        }
+
+        $validations = [
+            'phone_number' => 'required'
+        ];
+        
+        if($request->interactive_type == 'cta_url') {
+            $validations['cta_url.display_text'] = "required|min:1|max:20";
+            $validations['cta_url.url'] = "required";
+        } elseif($request->interactive_type == 'list') {
+            $validations['list_data'] = 'required|array';
+            $validations['list_data.button_text'] = 'required|string';
+            $validations['list_data.sections'] = 'required|array';
+            $validations['list_data.sections.*.title'] = 'required|string';
+            $validations['list_data.sections.*.id'] = 'required|string';
+            $validations['list_data.sections.*.rows'] = 'required|array';
+            $validations['list_data.sections.*.rows.*.id'] = 'required|string';
+            $validations['list_data.sections.*.rows.*.row_id'] = 'required|string';
+            $validations['list_data.sections.*.rows.*.title'] = 'required|string';
+            $validations['list_data.sections.*.rows.*.description'] = 'required|string';
+        } else {
+            // must be reply button type
+            // at least 1 button is required
+            $validations['buttons.1'] = "required|min:1|max:20";
+            $validations['buttons.2'] = "nullable|min:1|max:20";
+            $validations['buttons.3'] = "nullable|min:1|max:20";
+            if(array_filter($request->buttons) != array_unique(array_filter($request->buttons))) {
+                return $this->processResponse(3, [
+                    3 => __tr('Buttons labels should be unique.')
+                ], [], true);
+            }
+        }
+        // if header is not a text then it should be media
+        if($request->header_type == 'text') {
+            // if header text then its required
+            $validations['header_text'] = "required";
+        }
+        
+        // validate the inputs
+        $request->validate($validations);
+        
+        $inputData = $request->all();
+        $inputData['messageBody'] = '';
+        $inputData['contactUid'] = '';
+        // send message
+        $processReaction = $this->whatsAppServiceEngine->processSendChatMessage($inputData, false, false, [
+            'interaction_message_data' => $request->except('from_phone_number_id', 'phone_number', 'contact')
+        ]);
         // processed data
         $processedData = $processReaction->data();
         // get back the response
@@ -471,14 +569,19 @@ class WhatsAppServiceController extends BaseController
                 'uuid',
             ],
         ]);
+        $targetElement = '#lwTemplateStructureContainer';
+
+        if ($request->get('form_type') == 'edit_template_bot') {
+            $targetElement = '#lwTemplateStructureEditContainer';
+        }
         // ask engine to process the request
-        $processReaction = $this->whatsAppServiceEngine->processTemplateChange($request->get('template_selection'));
+        $processReaction = $this->whatsAppServiceEngine->processTemplateChange($request->get('template_selection'), $request->get('page_type'));
         if ($processReaction->success()) {
             return $this->responseAction(
                 $this->processResponse($processReaction, [], [
                     '_uid' => $request->get('template_selection')
                 ]),
-                $this->replaceContent($processReaction->data('template'), '#lwTemplateStructureContainer')
+                $this->replaceContent($processReaction->data('template'), $targetElement)
             );
         }
 
@@ -612,7 +715,7 @@ class WhatsAppServiceController extends BaseController
                 22 => __tr('Functionality is disabled in this demo.')
             ], [], true);
         }
-        $request->validate([
+        $validations = [
             'request_code' => [
                 'required'
             ],
@@ -620,11 +723,14 @@ class WhatsAppServiceController extends BaseController
                 'required',
                 'numeric'
             ],
-            'phone_number_id' => [
-                'required',
+        ];
+        if(!$request->is_app_onboarding) {
+            $validations['phone_number_id'] = [
+                 'required',
                 'numeric'
-            ],
-        ]);
+            ];
+        }
+        $request->validate($validations);
         $processReaction = $this->whatsAppServiceEngine->setupWhatsAppEmbeddedSignUpProcess($request);
         if($processReaction->success()) {
             // sync templates
@@ -767,6 +873,41 @@ class WhatsAppServiceController extends BaseController
         // get back to controller with engine response
         return $this->processResponse($processReaction, [], [], true);
     }
+
+    /**
+     * Get Display Name
+     *
+     * @param int $phoneNumberId
+     * @return json
+     */
+    function getDisplayName($phoneNumberId) {
+        validateVendorAccess('administrative');
+        // ask engine to process the request
+        $processReaction = $this->whatsAppServiceEngine->requestDisplayName($phoneNumberId);
+        // get back to controller with engine response
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
+    /**
+     * Update Display Name
+     *
+     * @param BaseRequestTwo $request
+     * @return json
+     */
+    function updateDisplayName(BaseRequestTwo $request) {
+        validateVendorAccess('administrative');
+        $request->validate([
+            'verified_name' => [
+                'required',
+                'max:256',
+            ]
+        ]);
+        // ask engine to process the request
+        $processReaction = $this->whatsAppServiceEngine->requestUpdateDisplayName($request);
+        // get back to controller with engine response
+        return $this->processResponse($processReaction, [], [], true);
+    }
+
     /**
      * Update Two Step Verification Plugin
      *

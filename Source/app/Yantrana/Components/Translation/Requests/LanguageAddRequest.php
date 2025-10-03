@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * LanguageAddRequest.php - Request file
 *
 * This file is part of the Translation component.
@@ -57,7 +75,7 @@ class LanguageAddRequest extends BaseRequest
 
         $rules = [
             'language_name' => 'required|min:3|max:15|unique_language_name',
-            'language_id' => 'required|min:2|max:15|alpha_dash|unique_language_id',
+            'language_id' => 'required|min:2|max:2|alpha|unique_language_id',
         ];
 
         return $rules;

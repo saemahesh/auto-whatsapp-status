@@ -19,6 +19,16 @@ background-color: {{ getAppSettings('app_sidebar_bg_color') }}!important;
 .navbar.lw-sidebar-container.navbar-light .navbar-nav .nav-link .fa {
 color: {{ getAppSettings('app_sidebar_text_color') }}!important;
 }
+div:where(.swal2-container) div:where(.swal2-popup),
+.navbar.lw-sidebar-container ,.navbar-collapse, .card, .card-header, fieldset:not(.filepond--file-wrapper) {
+    background-color: {{ getAppSettings('app_sidebar_bg_color') }}!important;
+    border-color: {{ darkenColorValue(getAppSettings('app_sidebar_bg_color'), 10) }}!important;
+    }
+.card-body fieldset:not(.filepond--file-wrapper) legend {
+    background-color: {{ darkenColorValue(getAppSettings('app_sidebar_bg_color'), 5) }}!important;
+    border-color: {{ darkenColorValue(getAppSettings('app_sidebar_bg_color'), 10) }}!important;
+    color: {{ getAppSettings('app_sidebar_text_color') }}!important;
+}
 @php
 $bootstrapClasses = [
 'primary' => '#007bff',
@@ -41,7 +51,7 @@ $bgColor = getAppSettings('app_bs_color_'.$bootstrapClass) ?: $bootstrapClassVal
 .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .user-bar {
 background-color: {{ darkenColorValue($bgColor, 35) }}!important;
 }
-.card.lw-whatsapp-chat-block-container .nav-tabs {
+.card.lw-whatsapp-chat-block-container .nav-tabs, .nav-tabs .nav-link.active {
 border-color: {{ $bgColor }} !important;
 }
 .lw-page-title,a {
@@ -57,9 +67,21 @@ border-color: {{ darkenColorValue($bgColor, 10) }};
 @endif
 .mdtoast.mdt--{{ $bootstrapClass }}
 @if($bootstrapClass == 'primary')
-,.lw-minimized-menu .navbar-vertical.navbar-expand-md .navbar-nav .nav-link.active:before,
-div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm, .dropdown-item.active, .dropdown-item:active
-,.main-content .navbar-top
+,.lw-minimized-menu .navbar-vertical.navbar-expand-md .navbar-nav .nav-link.active:before,.nav-tabs .nav-link.active, .dropdown-item:before, .dropdown-item:hover,.dropdown-menu .active a.dropdown-item,
+div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm, .dropdown-item.active, .dropdown-item:active,
+.conversation-compose .send .circle, .page-item.active .page-link,.btn.btn-light.lw-save-language,
+table.dataTable.dtr-inline.collapsed > tbody > tr > td:first-child:before, table.dataTable.dtr-inline.collapsed > tbody > tr > th:first-child:before
+,#navbar-main
+@endif
+{
+background-color: {{ $bgColor }}!important;
+border-color: {{ darkenColorValue($bgColor, 10) }}!important;
+color: #ffffff!important;
+}
+@if($bootstrapClass == 'secondary')
+.modal-header,
+.modal-header .h1, .modal-header .h2, .modal-header .h3, .modal-header .h4, .modal-header .h5, .modal-header .h6, .modal-header h1, .modal-header h2, .modal-header h3, .modal-header h4, .modal-header h5, .modal-header h6,
+.modal-header .close
 @endif
 {
 background-color: {{ $bgColor }};
@@ -108,16 +130,21 @@ html > body {
 
 {{-- dark theme colors --}}
 @if($currentAppTheme=='dark')
-
-
     html > body {
     background-color: {{ getAppSettings('dark_theme_app_bg_color') }}!important;
     }
     .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .conversation {
     background-color: {{ darkenColorValue(getAppSettings('dark_theme_app_bg_color'), 9) }}!important;
     }
-    .navbar.lw-sidebar-container ,.navbar-collapse {
+    div:where(.swal2-container) div:where(.swal2-popup),
+    .navbar.lw-sidebar-container ,.navbar-collapse, .card, .card-header, fieldset:not(.filepond--file-wrapper) {
     background-color: {{ getAppSettings('dark_theme_app_sidebar_bg_color') }}!important;
+    border-color: {{ darkenColorValue(getAppSettings('dark_theme_app_sidebar_bg_color'), -100) }}!important;
+    }
+    .card-body fieldset:not(.filepond--file-wrapper) legend {
+        background-color: {{ darkenColorValue(getAppSettings('dark_theme_app_sidebar_bg_color'), -50) }}!important;
+        border-color: {{ darkenColorValue(getAppSettings('dark_theme_app_sidebar_bg_color'), -100) }}!important;
+        color: {{ getAppSettings('dark_theme_app_sidebar_text_color') }}!important;
     }
     .navbar.lw-sidebar-container.navbar-light .navbar-nav .nav-link[data-toggle=collapse]:after,
     .navbar.lw-sidebar-container.navbar-light .navbar-nav .nav-link,
@@ -149,16 +176,23 @@ html > body {
     border-color: {{ darkenColorValue($bgColor, 10) }};
     }
     @endif
+    @if($bootstrapClass == 'secondary')
+    .modal-header,
+    .modal-header .h1, .modal-header .h2, .modal-header .h3, .modal-header .h4, .modal-header .h5, .modal-header .h6, .modal-header h1, .modal-header h2, .modal-header h3, .modal-header h4, .modal-header h5, .modal-header h6,
+    .modal-header .close
+    @endif
     .mdtoast.mdt--{{ $bootstrapClass }}
     @if($bootstrapClass == 'primary')
-    ,.lw-minimized-menu .navbar-vertical.navbar-expand-md .navbar-nav .nav-link.active:before,
-    div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm, .dropdown-item.active, .dropdown-item:active
-    ,.main-content .navbar-top
+    ,.lw-minimized-menu .navbar-vertical.navbar-expand-md .navbar-nav .nav-link.active:before,.nav-tabs .nav-link.active, .dropdown-item:before, .dropdown-item:hover,.dropdown-menu .active a.dropdown-item,
+    div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm, .dropdown-item.active, .dropdown-item:active,
+    .conversation-compose .send .circle, .page-item.active .page-link,.btn.btn-light.lw-save-language,
+    table.dataTable.dtr-inline.collapsed > tbody > tr > td:first-child:before, table.dataTable.dtr-inline.collapsed > tbody > tr > th:first-child:before
+    ,#navbar-main
     @endif
     {
-    background-color: {{ $bgColor }};
-    border-color: {{ darkenColorValue($bgColor, 10) }};
-    color: #ffffff;
+    background-color: {{ $bgColor }}!important;
+    border-color: {{ darkenColorValue($bgColor, 10) }}!important;
+    color: #ffffff !important;
     }
     @php
     $css .= ".bg-$bootstrapClass { background-color: $bgColor !important; }\n";
@@ -168,7 +202,9 @@ html > body {
     $css .= ".btn-outline-$bootstrapClass:not(:disabled):not(.disabled).active, .btn-outline-$bootstrapClass:not(:disabled):not(.disabled):active, .show>.btn-outline-$bootstrapClass.dropdown-toggle,.btn.btn-$bootstrapClass { background-color: $bgColor !important; border-color: $bgColor !important; color:
     #fff !important; }\n";
     $css .= ".btn.btn-dark, .alert.alert-dark{ 
-        color: #000 !important; 
+    
+            color :#ffffff !important;
+           
     }\n";
     $css .= ".btn.btn-$bootstrapClass:hover { background-color: ". darkenColorValue($bgColor, 10) ." !important;
     border-color: ". darkenColorValue($bgColor, 10) ." !important; }\n";
@@ -211,13 +247,20 @@ html > body {
         .card.lw-whatsapp-chat-block-container .lw-whatsapp-chat-window .conversation {
         background-color: {{ darkenColorValue(getAppSettings('dark_theme_app_bg_color'), 9) }}!important;
         }
-        .navbar.lw-sidebar-container ,.navbar-collapse {
+        div:where(.swal2-container) div:where(.swal2-popup),
+        .navbar.lw-sidebar-container ,.navbar-collapse, .card, .card-header, fieldset:not(.filepond--file-wrapper) {
         background-color: {{ getAppSettings('dark_theme_app_sidebar_bg_color') }}!important;
+        border-color: {{ darkenColorValue(getAppSettings('dark_theme_app_sidebar_bg_color'), -100) }}!important;
         }
         .navbar.lw-sidebar-container.navbar-light .navbar-nav .nav-link[data-toggle=collapse]:after,
         .navbar.lw-sidebar-container.navbar-light .navbar-nav .nav-link,
         .navbar.lw-sidebar-container.navbar-light .navbar-nav .nav-link .fa {
         color: {{ getAppSettings('dark_theme_app_sidebar_text_color') }}!important;
+        }
+        .card-body fieldset:not(.filepond--file-wrapper) legend {
+            background-color: {{ darkenColorValue(getAppSettings('dark_theme_app_sidebar_bg_color'), -50) }}!important;
+            border-color: {{ darkenColorValue(getAppSettings('dark_theme_app_sidebar_bg_color'), -100) }}!important;
+            color: {{ getAppSettings('dark_theme_app_sidebar_text_color') }}!important;
         }
         @php
         $css = '';
@@ -246,14 +289,16 @@ html > body {
         @endif
         .mdtoast.mdt--{{ $bootstrapClass }}
         @if($bootstrapClass == 'primary')
-        ,.lw-minimized-menu .navbar-vertical.navbar-expand-md .navbar-nav .nav-link.active:before,
-        div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm, .dropdown-item.active, .dropdown-item:active
-        ,.main-content .navbar-top
+        ,.lw-minimized-menu .navbar-vertical.navbar-expand-md .navbar-nav .nav-link.active:before,.nav-tabs .nav-link.active, .dropdown-item:before, .dropdown-item:hover,.dropdown-menu .active a.dropdown-item,
+        div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm, .dropdown-item.active, .dropdown-item:active,
+        .conversation-compose .send .circle, .page-item.active .page-link,.btn.btn-light.lw-save-language,
+        table.dataTable.dtr-inline.collapsed > tbody > tr > td:first-child:before, table.dataTable.dtr-inline.collapsed > tbody > tr > th:first-child:before
+        ,#navbar-main
         @endif
         {
-        background-color: {{ $bgColor }};
-        border-color: {{ darkenColorValue($bgColor, 10) }};
-        color: #ffffff;
+        background-color: {{ $bgColor }}!important;
+        border-color: {{ darkenColorValue($bgColor, 10) }}!important;
+        color: #ffffff !important;
         }
         @php
         $css .= ".bg-$bootstrapClass { background-color: $bgColor !important; }\n";
@@ -263,7 +308,9 @@ html > body {
         $css .= ".btn-outline-$bootstrapClass:not(:disabled):not(.disabled).active, .btn-outline-$bootstrapClass:not(:disabled):not(.disabled):active, .show>.btn-outline-$bootstrapClass.dropdown-toggle,.btn.btn-$bootstrapClass { background-color: $bgColor !important; border-color: $bgColor !important; color:
         #fff !important; }\n";
         $css .= ".btn.btn-dark, .alert.alert-dark{ 
-            color: #000 !important; 
+           
+            color :#ffffff !important;
+           
         }\n";
         $css .= ".btn.btn-$bootstrapClass:hover { background-color: ". darkenColorValue($bgColor, 10) ." !important;
         border-color: ". darkenColorValue($bgColor, 10) ." !important; }\n";

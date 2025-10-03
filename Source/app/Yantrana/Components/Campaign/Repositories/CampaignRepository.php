@@ -1,5 +1,23 @@
 <?php
 /**
+ * WhatsJet
+ *
+ * This file is part of the WhatsJet software package developed and licensed by livelyworks.
+ *
+ * You must have a valid license to use this software.
+ *
+ * © 2025 livelyworks. All rights reserved.
+ * Redistribution or resale of this file, in whole or in part, is prohibited without prior written permission from the author.
+ *
+ * For support or inquiries, contact: contact@livelyworks.net
+ *
+ * @package     WhatsJet
+ * @author      livelyworks <contact@livelyworks.net>
+ * @copyright   Copyright (c) 2025, livelyworks
+ * @website     https://livelyworks.net
+ */
+
+/**
 * CampaignRepository.php - Repository file
 *
 * This file is part of the Campaign component.
@@ -57,6 +75,7 @@ class CampaignRepository extends BaseRepository implements CampaignRepositoryInt
             'messageLog',
             'queuePendingMessages',
             'queueProcessingMessages',
+            'queueFailedMessages',
         ])->dataTables($dataTableConfig)->toArray();
     }
 
@@ -75,7 +94,13 @@ class CampaignRepository extends BaseRepository implements CampaignRepositoryInt
         ->withCount('messageLog')->withCount([
             'queuePendingMessages',
             'queueProcessingMessages',
-        ])->with(['messageLog', 'queueMessages'])->first();
+            'queueFailedMessages',
+        ])->with([
+            'messageLog' => function($query) {
+                $query->whereNull('is_system_message');
+            }, 
+            'queueMessages'
+        ])->first();
     }
 
     /**
@@ -132,6 +157,9 @@ class CampaignRepository extends BaseRepository implements CampaignRepositoryInt
                 'status',
                 'phone_with_country_code',
             ],
+            'fieldAlias' => [
+                'formatted_status' => 'status',
+            ]
         ];
         // search name in json
         request()->merge([
@@ -142,6 +170,7 @@ class CampaignRepository extends BaseRepository implements CampaignRepositoryInt
         ]);
         // Get Model result for dataTables
         return WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)
+        ->whereNotIn('status', [5]) // Expired
         ->select(
             DB::raw(
                 "*,
@@ -201,6 +230,50 @@ class CampaignRepository extends BaseRepository implements CampaignRepositoryInt
         ->toArray();
     }
     /**
+    * Fetch campaign datatable source
+    *
+    * @return mixed
+    *---------------------------------------------------------------- */
+    public function fetchCampaignExpiredLogTableSource($campaignId)
+    {
+        // basic configurations for dataTables data
+        $dataTableConfig = [
+            // searchable columns
+            'searchable' => [
+                'fullName' => DB::raw("LOWER(CONCAT(
+                    JSON_UNQUOTE(JSON_EXTRACT(__data, '$.contact_data.first_name')), ' ',
+                    JSON_UNQUOTE(JSON_EXTRACT(__data, '$.contact_data.last_name'))
+                ))"),
+                'updated_at',
+                'status',
+                'phone_with_country_code',
+            ],
+        ];
+        // search name in json
+        request()->merge([
+            'search' => [
+                'value' => strtolower(request()->search['value'] ?? ''),
+                'regex' => request()->search['regex'] ?? null
+            ]
+        ]);
+        // Get Model result for dataTables
+        return WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)
+        ->where('status', 5) // Expired
+        ->select(
+            DB::raw(
+                "*,
+            JSON_UNQUOTE(JSON_EXTRACT(__data, '$.contact_data.first_name')) as first_name,
+            JSON_UNQUOTE(JSON_EXTRACT(__data, '$.contact_data.last_name')) as last_name,
+            CONCAT(
+                JSON_UNQUOTE(JSON_EXTRACT(__data, '$.contact_data.first_name')), ' ',
+                JSON_UNQUOTE(JSON_EXTRACT(__data, '$.contact_data.last_name'))
+            ) as full_name"
+            )
+        )
+            ->dataTables($dataTableConfig)
+            ->toArray();
+    }
+    /**
      * Get the campaign  Executed data
      *
      * @param int  $campaignId
@@ -220,6 +293,63 @@ class CampaignRepository extends BaseRepository implements CampaignRepositoryInt
     */
     public function fetchCampaignQueueLogDataLazily($campaignId, $callback)
     {
-        return WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)->lazy()->each($callback);
+        return WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)
+            ->whereNotIn('status', [5]) // Not Expired
+            ->lazy()
+            ->each($callback);
+    }
+    /**
+    * Get the campaign expired log data
+    *
+    * @param int $campaignId
+
+    * @return LazyCollection
+    */
+    public function fetchCampaignExpiredLogDataLazily($campaignId, $callback)
+    {
+        return WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)
+            ->where('status', 5) // Expired
+            ->lazy()
+            ->each($callback);
+    }
+
+    /**
+    * Get the campaign expired log data
+    *
+    * @param int $campaignId
+
+    * @return LazyCollection
+    */
+    public function fetchFailedCampaignByType($campaignId, $failedCampaignType)
+    {
+        if ($failedCampaignType == 'queue') {
+            return WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)
+            ->select('_id', 'campaigns__id', 'contacts__id', 'status')
+            ->whereNotIn('status', [5]) // Expired
+            ->get();
+        } elseif ($failedCampaignType == 'expired') {
+            return WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)
+            ->select('_id', 'campaigns__id', 'contacts__id', 'status')
+            ->where('status', 5) // Expired
+            ->get();
+        } elseif ($failedCampaignType == 'executed') {
+            return WhatsAppMessageLogModel::where('campaigns__id', $campaignId)
+                ->select('_id', 'campaigns__id', 'contacts__id')
+                ->get();
+        }
+        
+    }
+
+    public function fetchTotalCampaignContacts($campaignId) 
+    {
+        $messageQueueData = WhatsAppMessageQueueModel::where('campaigns__id', $campaignId)
+            ->select('_id', 'campaigns__id', 'contacts__id')
+            ->get();
+
+        $messageLogData = WhatsAppMessageLogModel::where('campaigns__id', $campaignId)
+            ->select('_id', 'campaigns__id', 'contacts__id')
+            ->get();
+
+        return $messageQueueData->merge($messageLogData);
     }
 }
