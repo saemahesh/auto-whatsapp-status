@@ -42,10 +42,6 @@ ADD INDEX `idx_campaign_status_created` (`campaigns__id`, `status`, `created_at`
 ALTER TABLE `contacts`
 ADD INDEX `idx_vendor_wa_id` (`vendors__id`, `wa_id`);
 
--- Adding index for phone number lookups
-ALTER TABLE `contacts`
-ADD INDEX `idx_phone_number` (`phone_number_full`);
-
 -- 5. bot_replies - Critical for chatbot performance
 -- Adding composite index for trigger matching
 ALTER TABLE `bot_replies`
