@@ -1,6 +1,7 @@
 const axios = require('axios');
 const db = require('./database');
 const logger = require('../utils/logger');
+const { decryptLaravelValue } = require('../utils/laravel-crypto');
 
 class WhatsAppAPI {
     constructor() {
@@ -27,10 +28,10 @@ class WhatsAppAPI {
         try {
             // Fetch vendor configuration from vendor_settings table (like PHP)
             const [settings] = await db.execute(
-                `SELECT name, value 
-                FROM vendor_settings 
-                WHERE vendors__id = ? AND status = 1 
-                AND name IN ('whatsapp_access_token', 'current_phone_number_id', 'whatsapp_business_account_id', 'current_phone_number_number')`,
+                `SELECT name, value, data_type
+                 FROM vendor_settings
+                 WHERE vendors__id = ?
+                 AND name IN ('whatsapp_access_token', 'current_phone_number_id', 'whatsapp_business_account_id', 'current_phone_number_number')`,
                 [vendorId]
             );
 
@@ -41,7 +42,12 @@ class WhatsAppAPI {
             // Convert array of settings to object
             const settingsObj = {};
             settings.forEach(row => {
-                settingsObj[row.name] = row.value;
+                const decryptedValue = decryptLaravelValue(row.value, {
+                    vendorId,
+                    setting: row.name,
+                });
+
+                settingsObj[row.name] = this.normalizeSettingValue(row.data_type, decryptedValue);
             });
 
             const vendorSettings = {
@@ -69,6 +75,37 @@ class WhatsAppAPI {
                 vendorId 
             });
             throw error;
+        }
+    }
+
+    normalizeSettingValue(dataType, value) {
+        if (value === null || value === undefined) {
+            return value;
+        }
+
+        switch (dataType) {
+            case 2: // boolean
+                if (typeof value === 'boolean') return value;
+                return value === '1' || value === 1 || value === true;
+            case 3: // integer
+                return Number.parseInt(value, 10);
+            case 4: // json
+                if (typeof value === 'object') {
+                    return value;
+                }
+                try {
+                    return JSON.parse(value);
+                } catch (error) {
+                    logger.warn('Failed to parse vendor setting JSON, returning raw string', {
+                        value,
+                        dataType,
+                    });
+                    return value;
+                }
+            case 6: // float
+                return Number.parseFloat(value);
+            default:
+                return value;
         }
     }
 

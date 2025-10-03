@@ -23,10 +23,10 @@ app.use(morgan('combined'));  // Request logging
 // Debug middleware - log ALL incoming requests
 app.use((req, res, next) => {
     console.log(`[EXPRESS] ${req.method} ${req.path} - ${new Date().toISOString()}`);
-    console.log(`[EXPRESS] Headers:`, JSON.stringify(req.headers, null, 2));
-    if (req.body && Object.keys(req.body).length > 0) {
-        console.log(`[EXPRESS] Body:`, JSON.stringify(req.body, null, 2));
-    }
+    // console.log(`[EXPRESS] Headers:`, JSON.stringify(req.headers, null, 2));
+    // if (req.body && Object.keys(req.body).length > 0) {
+        // console.log(`[EXPRESS] Body:`, JSON.stringify(req.body, null, 2));
+    // }
     next();
 });
 
