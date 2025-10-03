@@ -79,7 +79,7 @@ router.post('/:vendorUid', async (req, res) => {
     console.log('========================================');
     console.log('[WEBHOOK POST] Received webhook data');
     console.log('[WEBHOOK POST] vendorUid:', req.params.vendorUid);
-    console.log('[WEBHOOK POST] Payload:', JSON.stringify(req.body, null, 2));
+    // console.log('[WEBHOOK POST] Payload:', JSON.stringify(req.body, null, 2));
     
     const { vendorUid } = req.params;
     
