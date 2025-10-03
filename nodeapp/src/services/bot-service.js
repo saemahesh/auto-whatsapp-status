@@ -249,17 +249,19 @@ class BotService {
         }
 
         // Fetch from database (matches PHP getRelatedOrWelcomeBots at line 154)
+        // IMPORTANT: Get ALL bots for vendor, filter by status later (like PHP does)
+        // PHP doesn't filter by status in query, it filters in the loop
         const [rows] = await this.db.execute(
             `SELECT br._id, br.reply_trigger, br.trigger_type, br.reply_text, br.__data, br.priority_index, br.status,
                     br.bot_flows__id, bf.status as bot_flow_status
              FROM bot_replies br
              LEFT JOIN bot_flows bf ON br.bot_flows__id = bf._id
-             WHERE br.vendors__id = ? AND br.status = 1
+             WHERE br.vendors__id = ?
              ORDER BY br.priority_index ASC`,
             [vendorId]
         );
 
-        logger.info(`Loaded ${rows.length} active bots from database for vendor ${vendorId}`);
+        logger.info(`Loaded ${rows.length} bot_replies from database for vendor ${vendorId} (including all statuses)`);
 
         const bots = rows.map(row => {
             let parsedData = {};
