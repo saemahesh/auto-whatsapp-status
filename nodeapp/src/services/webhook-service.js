@@ -15,7 +15,7 @@ class WebhookService {
     async processWebhook(vendorUid, payload) {
         console.log('[WEBHOOK SERVICE] processWebhook called');
         console.log('[WEBHOOK SERVICE] vendorUid:', vendorUid);
-        console.log('[WEBHOOK SERVICE] payload:', JSON.stringify(payload, null, 2));
+        // console.log('[WEBHOOK SERVICE] payload:', JSON.stringify(payload, null, 2));
         
         // Get vendor ID from UID
         console.log('[WEBHOOK SERVICE] Getting vendor ID from UID...');

@@ -12,7 +12,7 @@ const webhookWorker = new Worker('whatsapp-webhooks', async (job) => {
     console.log('[WEBHOOK WORKER] Processing job:', job.id);
     const { vendorUid, payload, receivedAt } = job.data;
     console.log('[WEBHOOK WORKER] Job data:', { vendorUid, receivedAt });
-    console.log('[WEBHOOK WORKER] Job payload:', JSON.stringify(payload, null, 2));
+    // console.log('[WEBHOOK WORKER] Job payload:', JSON.stringify(payload, null, 2));
     
     logger.info(`Processing webhook ${job.id} for vendor ${vendorUid}`);
     
