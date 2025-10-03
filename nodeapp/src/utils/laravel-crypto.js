@@ -44,6 +44,9 @@ class LaravelCrypto {
      */
     decrypt(encryptedValue) {
         if (!this.isInitialized()) {
+            logger.error('LaravelCrypto not initialized - APP_KEY missing', {
+                hint: 'Add APP_KEY to nodeapp/.env from Source/.env'
+            });
             throw new Error('LaravelCrypto not initialized. Call initialize() with APP_KEY first.');
         }
 
@@ -52,12 +55,20 @@ class LaravelCrypto {
             const payload = JSON.parse(encryptedValue);
 
             if (!payload.iv || !payload.value || !payload.mac) {
+                logger.warn('Invalid Laravel encrypted payload format', {
+                    hasIv: !!payload.iv,
+                    hasValue: !!payload.value,
+                    hasMac: !!payload.mac
+                });
                 throw new Error('Invalid Laravel encrypted payload format');
             }
 
             // Verify MAC (Message Authentication Code)
             const mac = this.hash(payload.iv, payload.value);
             if (mac !== payload.mac) {
+                logger.error('MAC verification failed - APP_KEY may be incorrect', {
+                    hint: 'Ensure APP_KEY in nodeapp/.env matches Source/.env exactly'
+                });
                 throw new Error('MAC verification failed - data may be corrupted');
             }
 
@@ -72,10 +83,14 @@ class LaravelCrypto {
             let decrypted = decipher.update(value);
             decrypted = Buffer.concat([decrypted, decipher.final()]);
 
-            return decrypted.toString('utf8');
+            const decryptedValue = decrypted.toString('utf8');
+            logger.debug('Successfully decrypted Laravel value');
+            return decryptedValue;
         } catch (error) {
-            logger.warn('Failed to decrypt Laravel value, returning raw string', {
-                error: error.message
+            logger.error('Failed to decrypt Laravel value', {
+                error: error.message,
+                valuePreview: encryptedValue.substring(0, 50) + '...',
+                hint: 'Check if APP_KEY in nodeapp/.env matches Source/.env'
             });
             // Return original value if decryption fails
             return encryptedValue;

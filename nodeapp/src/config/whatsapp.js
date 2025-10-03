@@ -9,17 +9,36 @@ class WhatsAppAPI {
         this.baseURL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v23.0';
         this.vendorSettingsCache = new Map();
         this.cacheExpiry = 5 * 60 * 1000; // 5 minutes cache for vendor settings
+        this.cryptoInitialized = false;
         
         // Initialize Laravel crypto if APP_KEY is available
-        if (process.env.APP_KEY) {
-            try {
-                laravelCrypto.initialize(process.env.APP_KEY);
-                logger.info('Laravel crypto initialized successfully');
-            } catch (error) {
-                logger.error('Failed to initialize Laravel crypto', { error: error.message });
-            }
-        } else {
-            logger.warn('APP_KEY not set - Laravel encrypted values will not be decrypted');
+        this.initializeCrypto();
+    }
+
+    /**
+     * Initialize Laravel crypto with APP_KEY
+     */
+    initializeCrypto() {
+        const appKey = process.env.APP_KEY;
+        
+        if (!appKey) {
+            logger.warn('APP_KEY not set - Laravel encrypted values will not be decrypted', {
+                hint: 'Add APP_KEY to nodeapp/.env from Source/.env'
+            });
+            return;
+        }
+
+        try {
+            laravelCrypto.initialize(appKey);
+            this.cryptoInitialized = true;
+            logger.info('Laravel crypto initialized successfully', {
+                appKeyPreview: appKey.substring(0, 15) + '...'
+            });
+        } catch (error) {
+            logger.error('Failed to initialize Laravel crypto', { 
+                error: error.message,
+                hint: 'Check if APP_KEY format is correct (should start with base64:)'
+            });
         }
     }
 
@@ -55,18 +74,32 @@ class WhatsAppAPI {
             // Convert array of settings to object and decrypt values
             const settingsObj = {};
             settings.forEach(row => {
+                const isEncrypted = laravelCrypto.isEncrypted(row.value);
+                
+                logger.debug(`Processing setting: ${row.name}`, {
+                    vendorId,
+                    isEncrypted,
+                    cryptoInitialized: laravelCrypto.isInitialized(),
+                    valuePreview: row.value ? row.value.substring(0, 50) + '...' : 'null'
+                });
+
                 // Decrypt Laravel encrypted values
-                if (laravelCrypto.isInitialized() && laravelCrypto.isEncrypted(row.value)) {
-                    settingsObj[row.name] = laravelCrypto.decrypt(row.value);
-                    logger.debug(`Decrypted setting: ${row.name} for vendor ${vendorId}`);
+                if (laravelCrypto.isInitialized() && isEncrypted) {
+                    const decrypted = laravelCrypto.decrypt(row.value);
+                    settingsObj[row.name] = decrypted;
+                    logger.info(`✓ Decrypted setting: ${row.name} for vendor ${vendorId}`, {
+                        decryptedPreview: decrypted ? decrypted.substring(0, 20) + '...' : 'null'
+                    });
                 } else {
                     settingsObj[row.name] = row.value;
-                    if (laravelCrypto.isEncrypted(row.value)) {
-                        logger.warn('Failed to decrypt Laravel value, returning raw string', {
-                            error: 'APP_KEY environment variable is not set',
+                    if (isEncrypted && !laravelCrypto.isInitialized()) {
+                        logger.error('Cannot decrypt - crypto not initialized', {
                             setting: row.name,
-                            vendorId
+                            vendorId,
+                            hint: 'APP_KEY is not set or invalid'
                         });
+                    } else if (!isEncrypted) {
+                        logger.debug(`Setting ${row.name} is not encrypted, using as-is`);
                     }
                 }
             });
@@ -78,8 +111,20 @@ class WhatsAppAPI {
                 phoneNumber: settingsObj.current_phone_number_number
             };
 
+            // Log what we got
+            logger.info(`Vendor ${vendorId} settings loaded`, {
+                hasAccessToken: !!vendorSettings.accessToken,
+                accessTokenPreview: vendorSettings.accessToken ? vendorSettings.accessToken.substring(0, 15) + '...' : 'MISSING',
+                hasPhoneNumberId: !!vendorSettings.phoneNumberId,
+                phoneNumberId: vendorSettings.phoneNumberId || 'MISSING'
+            });
+
             // Validate required settings
             if (!vendorSettings.accessToken || !vendorSettings.phoneNumberId) {
+                logger.error(`Vendor ${vendorId} missing required WhatsApp configuration`, {
+                    hasAccessToken: !!vendorSettings.accessToken,
+                    hasPhoneNumberId: !!vendorSettings.phoneNumberId
+                });
                 throw new Error(`Vendor ${vendorId} missing required WhatsApp configuration`);
             }
 
