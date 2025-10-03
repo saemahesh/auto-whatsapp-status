@@ -10,35 +10,39 @@ class WhatsAppAPI {
         this.vendorSettingsCache = new Map();
         this.cacheExpiry = 5 * 60 * 1000; // 5 minutes cache for vendor settings
         this.cryptoInitialized = false;
-        
-        // Initialize Laravel crypto if APP_KEY is available
-        this.initializeCrypto();
     }
 
     /**
-     * Initialize Laravel crypto with APP_KEY
+     * Initialize Laravel crypto with APP_KEY (lazy initialization)
+     * Called when first needed to ensure .env is loaded
      */
-    initializeCrypto() {
+    ensureCryptoInitialized() {
+        if (this.cryptoInitialized) {
+            return true;
+        }
+
         const appKey = process.env.APP_KEY;
         
         if (!appKey) {
             logger.warn('APP_KEY not set - Laravel encrypted values will not be decrypted', {
                 hint: 'Add APP_KEY to nodeapp/.env from Source/.env'
             });
-            return;
+            return false;
         }
 
         try {
             laravelCrypto.initialize(appKey);
             this.cryptoInitialized = true;
-            logger.info('Laravel crypto initialized successfully', {
+            logger.info('✓ Laravel crypto initialized successfully', {
                 appKeyPreview: appKey.substring(0, 15) + '...'
             });
+            return true;
         } catch (error) {
-            logger.error('Failed to initialize Laravel crypto', { 
+            logger.error('✗ Failed to initialize Laravel crypto', { 
                 error: error.message,
                 hint: 'Check if APP_KEY format is correct (should start with base64:)'
             });
+            return false;
         }
     }
 
@@ -48,11 +52,15 @@ class WhatsAppAPI {
      * @returns {Promise<object>}
      */
     async getVendorSettings(vendorId) {
+        // Ensure crypto is initialized (lazy init)
+        this.ensureCryptoInitialized();
+
         // Check cache first
         const cacheKey = `vendor_${vendorId}`;
         const cached = this.vendorSettingsCache.get(cacheKey);
         
         if (cached && (Date.now() - cached.timestamp) < this.cacheExpiry) {
+            logger.debug(`Using cached settings for vendor ${vendorId}`);
             return cached.data;
         }
 
@@ -70,6 +78,8 @@ class WhatsAppAPI {
             if (settings.length === 0) {
                 throw new Error(`Vendor ${vendorId} settings not found`);
             }
+
+            logger.info(`Fetched ${settings.length} settings for vendor ${vendorId} from database`);
 
             // Convert array of settings to object and decrypt values
             const settingsObj = {};

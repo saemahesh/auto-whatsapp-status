@@ -39,7 +39,8 @@ class LaravelCrypto {
     /**
      * Decrypt Laravel encrypted value
      * Laravel format: {"iv":"xxx","value":"xxx","mac":"xxx","tag":"xxx"}
-     * @param {string} encryptedValue - JSON string with Laravel encryption format
+     * Handles both direct JSON string and base64-encoded JSON
+     * @param {string} encryptedValue - JSON string or base64-encoded JSON with Laravel encryption format
      * @returns {string} - Decrypted value
      */
     decrypt(encryptedValue) {
@@ -51,8 +52,24 @@ class LaravelCrypto {
         }
 
         try {
+            let jsonString = encryptedValue;
+            
+            // Check if value is base64-encoded first
+            try {
+                const decoded = Buffer.from(encryptedValue, 'base64').toString('utf8');
+                const testParse = JSON.parse(decoded);
+                if (testParse.iv && testParse.value && testParse.mac) {
+                    // It's base64-encoded JSON, use decoded version
+                    jsonString = decoded;
+                    logger.debug('Value was base64-encoded, decoded successfully');
+                }
+            } catch {
+                // Not base64 or not valid JSON after decode, use original
+                logger.debug('Value is direct JSON (not base64-encoded)');
+            }
+
             // Parse the Laravel encrypted format
-            const payload = JSON.parse(encryptedValue);
+            const payload = JSON.parse(jsonString);
 
             if (!payload.iv || !payload.value || !payload.mac) {
                 logger.warn('Invalid Laravel encrypted payload format', {
@@ -84,7 +101,7 @@ class LaravelCrypto {
             decrypted = Buffer.concat([decrypted, decipher.final()]);
 
             const decryptedValue = decrypted.toString('utf8');
-            logger.debug('Successfully decrypted Laravel value');
+            logger.debug('✓ Successfully decrypted Laravel value');
             return decryptedValue;
         } catch (error) {
             logger.error('Failed to decrypt Laravel value', {
@@ -113,20 +130,35 @@ class LaravelCrypto {
 
     /**
      * Check if a value is Laravel encrypted format
+     * Handles both JSON string and base64-encoded JSON
      * @param {string} value 
      * @returns {boolean}
      */
     isEncrypted(value) {
-        if (typeof value !== 'string') {
+        if (typeof value !== 'string' || !value) {
             return false;
         }
 
+        // Try parsing as JSON first
         try {
             const parsed = JSON.parse(value);
-            return !!(parsed.iv && parsed.value && parsed.mac);
+            if (parsed.iv && parsed.value && parsed.mac) {
+                return true;
+            }
         } catch {
-            return false;
+            // Not direct JSON, try base64 decode first
+            try {
+                const decoded = Buffer.from(value, 'base64').toString('utf8');
+                const parsed = JSON.parse(decoded);
+                if (parsed.iv && parsed.value && parsed.mac) {
+                    return true;
+                }
+            } catch {
+                // Not base64-encoded JSON either
+            }
         }
+
+        return false;
     }
 
     /**
