@@ -561,6 +561,67 @@ class WhatsAppAPI {
     }
 
     /**
+     * Download media from WhatsApp (matches PHP downloadMedia at line 714)
+     * @param {string} mediaId - WhatsApp media ID
+     * @param {number} vendorId 
+     * @returns {Promise<object>} - Media info with body buffer
+     */
+    async downloadMedia(mediaId, vendorId) {
+        try {
+            const settings = await this.getVendorSettings(vendorId);
+
+            // Step 1: Get media URL (matches PHP apiGetRequest)
+            const mediaInfoResponse = await axios.get(
+                `${this.baseURL}/${mediaId}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${settings.accessToken}`
+                    },
+                    timeout: parseInt(process.env.HTTP_TIMEOUT) || 10000
+                }
+            );
+
+            const mediaInfo = mediaInfoResponse.data;
+            const mediaUrl = mediaInfo.url;
+            const mimeType = mediaInfo.mime_type;
+            const sha256 = mediaInfo.sha256;
+            const fileSize = mediaInfo.file_size;
+
+            // Step 2: Download the actual media file (matches PHP get($retrievedMedia['url']))
+            const mediaResponse = await axios.get(mediaUrl, {
+                headers: {
+                    'Authorization': `Bearer ${settings.accessToken}`
+                },
+                responseType: 'arraybuffer', // Get as buffer for file operations
+                timeout: 30000 // 30 seconds for large files
+            });
+
+            logger.info('Media downloaded successfully', {
+                mediaId,
+                mimeType,
+                fileSize,
+                vendorId
+            });
+
+            return {
+                mime_type: mimeType,
+                sha256: sha256,
+                file_size: fileSize,
+                id: mediaId,
+                url: mediaUrl,
+                body: mediaResponse.data // Buffer containing file data
+            };
+        } catch (error) {
+            logger.error('Failed to download media', {
+                error: error.response?.data || error.message,
+                mediaId,
+                vendorId
+            });
+            throw error;
+        }
+    }
+
+    /**
      * Clear vendor settings cache
      * @param {number} vendorId - Optional specific vendor ID to clear
      */

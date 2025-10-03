@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const BotService = require('./bot-service');
+const mediaService = require('./media-service');
 
 console.log('[WEBHOOK SERVICE] WebhookService module loaded');
 
@@ -25,6 +26,13 @@ class WebhookService {
         }
         console.log('[WEBHOOK SERVICE] ✓ Vendor ID found:', vendorId);
 
+        // Check if vendor has active plan (matches PHP logic at line 3058-3062)
+        // Note: We log warning but don't block webhook processing to avoid webhook delivery failures
+        const hasActivePlan = await this.checkVendorActivePlan(vendorId);
+        if (!hasActivePlan) {
+            logger.warn(`Vendor ${vendorId} has no active plan, but processing webhook anyway`);
+        }
+
         const entry = payload.entry?.[0];
         const changes = entry?.changes?.[0];
         const field = changes?.field;
@@ -46,6 +54,29 @@ class WebhookService {
                 console.warn('[WEBHOOK SERVICE] ✗ Unknown webhook field:', field);
                 logger.warn(`Unknown webhook field: ${field}`);
                 return { processed: false };
+        }
+    }
+
+    /**
+     * Check if vendor has active subscription plan (matches PHP vendorPlanDetails)
+     * Simplified version - just checks if subscription exists and is active
+     * @param {number} vendorId 
+     * @returns {Promise<boolean>}
+     */
+    async checkVendorActivePlan(vendorId) {
+        try {
+            const [rows] = await this.db.execute(
+                `SELECT _id FROM subscriptions 
+                 WHERE vendors__id = ? 
+                 AND status = 1
+                 AND (ends_at IS NULL OR ends_at > NOW())
+                 LIMIT 1`,
+                [vendorId]
+            );
+            return rows.length > 0;
+        } catch (error) {
+            logger.error('Error checking vendor plan:', error);
+            return true; // Default to true to avoid blocking
         }
     }
 
@@ -77,17 +108,87 @@ class WebhookService {
         const messageStatus = status.status;  // sent, delivered, read, failed
         const timestamp = status.timestamp;
         const waId = status.recipient_id;
+        const errors = status.errors || [];  // WhatsApp API errors
         
-        console.log('[WEBHOOK SERVICE] Message status details:', { wamid, messageStatus, waId });
+        console.log('[WEBHOOK SERVICE] Message status details:', { wamid, messageStatus, waId, errors });
 
-        // Update message log
+        // Check for healthy ecosystem error 131049 (matches PHP at line 3341-3368)
+        // Marketing messages failed due to healthy ecosystem - we may reschedule it
+        const hasHealthyEcosystemError = errors.some(err => err.code == 131049);
+        
+        if (hasHealthyEcosystemError && messageStatus === 'failed') {
+            console.log('[WEBHOOK SERVICE] Healthy ecosystem error detected (131049), checking requeue eligibility...');
+            
+            // Find the queue item for this message
+            const [queueRows] = await this.db.execute(
+                `SELECT q._id, q._uid, q.retries, q.campaigns__id, c._id as contact_id
+                 FROM whatsapp_message_queue q
+                 INNER JOIN whatsapp_message_logs ml ON ml.campaigns__id = q.campaigns__id AND ml.wamid = ?
+                 LEFT JOIN contacts c ON c.wa_id = ? AND c.vendors__id = q.vendors__id
+                 WHERE q.vendors__id = ? 
+                 LIMIT 1`,
+                [wamid, waId, vendorId]
+            );
+            
+            if (queueRows.length > 0) {
+                const queueItem = queueRows[0];
+                const currentRetries = queueItem.retries || 0;
+                
+                // Requeue only if retries < 5 (matches PHP logic at line 3343)
+                if (currentRetries < 5) {
+                    const nextRetryHours = currentRetries + 1;
+                    
+                    // Requeue with delay (matches PHP addHours logic at line 3344)
+                    await this.db.execute(
+                        `UPDATE whatsapp_message_queue 
+                         SET status = 1, 
+                             retries = ?,
+                             scheduled_at = DATE_ADD(NOW(), INTERVAL ? HOUR),
+                             __data = JSON_SET(COALESCE(__data, '{}'), 
+                                 '$.process_response.error_message', ?,
+                                 '$.process_response.error_status', 'requeued_maintain_healthy_ecosystem'),
+                             updated_at = NOW()
+                         WHERE _uid = ?`,
+                        [
+                            currentRetries + 1,
+                            nextRetryHours,
+                            errors[0]?.message || 'Healthy ecosystem error',
+                            queueItem._uid
+                        ]
+                    );
+                    
+                    // Delete the failed log entry (matches PHP at line 3362-3365)
+                    await this.db.execute(
+                        'DELETE FROM whatsapp_message_logs WHERE wamid = ? AND vendors__id = ?',
+                        [wamid, vendorId]
+                    );
+                    
+                    console.log(`[WEBHOOK SERVICE] Message requeued for healthy ecosystem (retry ${currentRetries + 1}/5), will retry in ${nextRetryHours} hour(s)`);
+                    logger.info(`Message ${wamid} requeued for healthy ecosystem error (retry ${currentRetries + 1}/5)`);
+                    
+                    return { processed: true, status: 'requeued', reason: 'healthy_ecosystem_131049' };
+                } else {
+                    // Max retries reached, delete queue entry (matches PHP else block at line 3369-3376)
+                    await this.db.execute(
+                        'DELETE FROM whatsapp_message_queue WHERE _uid = ?',
+                        [queueItem._uid]
+                    );
+                    console.log('[WEBHOOK SERVICE] Max retries reached for healthy ecosystem error, queue entry deleted');
+                }
+            }
+        }
+
+        // Update message log - store status in __data JSON (PHP schema doesn't have message_status column)
         const [result] = await this.db.execute(
             `UPDATE whatsapp_message_logs 
-             SET message_status = ?, 
-                 status_timestamp = FROM_UNIXTIME(?),
-                 updated_at = NOW()
+             SET status = ?, 
+                 updated_at = NOW(),
+                 __data = JSON_SET(COALESCE(__data, '{}'), 
+                     '$.message_status', ?, 
+                     '$.status_timestamp', ?,
+                     '$.status_errors', ?)
              WHERE wamid = ? AND vendors__id = ?`,
-            [messageStatus, timestamp, wamid, vendorId]
+            [messageStatus, messageStatus, timestamp, JSON.stringify(errors), wamid, vendorId]
         );
         
         console.log('[WEBHOOK SERVICE] Message status updated in DB, affected rows:', result.affectedRows);
@@ -166,15 +267,64 @@ class WebhookService {
             messageBody = message.button?.text;
         }
         else if (['image', 'video', 'audio', 'document', 'sticker'].includes(messageType)) {
-            // Store media information (matches PHP media handling)
-            mediaData = {
-                type: messageType,
-                id: message[messageType]?.id,
-                mime_type: message[messageType]?.mime_type,
-                caption: message[messageType]?.caption,
-                sha256: message[messageType]?.sha256
-            };
-            messageBody = message[messageType]?.caption || `[${messageType}]`;
+            // Download and store media file (matches PHP at line 3244-3254)
+            const mediaId = message[messageType]?.id;
+            const caption = message[messageType]?.caption;
+            
+            try {
+                // Get vendor UID for storage path
+                const [vendorRows] = await this.db.execute(
+                    'SELECT _uid FROM vendors WHERE _id = ?',
+                    [vendorId]
+                );
+                const vendorUid = vendorRows[0]?._uid;
+
+                if (vendorUid && mediaId) {
+                    // Download and store media using MediaService
+                    const downloadedMedia = await mediaService.downloadAndStoreMediaFile(
+                        mediaId,
+                        vendorUid,
+                        vendorId,
+                        messageType
+                    );
+
+                    if (downloadedMedia) {
+                        mediaData = {
+                            type: messageType,
+                            link: downloadedMedia.path,
+                            caption: caption,
+                            mime_type: downloadedMedia.mime_type,
+                            file_name: downloadedMedia.fileName,
+                            original_filename: downloadedMedia.original_filename,
+                            file_size: downloadedMedia.file_size,
+                            sha256: downloadedMedia.sha256
+                        };
+                        logger.info(`Media downloaded and stored: ${downloadedMedia.path}`);
+                    } else {
+                        // Fallback if download fails - store metadata only
+                        mediaData = {
+                            type: messageType,
+                            id: mediaId,
+                            mime_type: message[messageType]?.mime_type,
+                            caption: caption,
+                            sha256: message[messageType]?.sha256
+                        };
+                        logger.warn(`Media download failed for ID: ${mediaId}, storing metadata only`);
+                    }
+                }
+            } catch (error) {
+                logger.error('Error downloading media:', error);
+                // Store metadata only on error
+                mediaData = {
+                    type: messageType,
+                    id: mediaId,
+                    mime_type: message[messageType]?.mime_type,
+                    caption: caption,
+                    sha256: message[messageType]?.sha256
+                };
+            }
+            
+            messageBody = caption || `[${messageType}]`;
         }
         else if (['location', 'contacts'].includes(messageType)) {
             // Store location/contacts data (matches PHP)
@@ -189,37 +339,43 @@ class WebhookService {
 
         // Handle reactions (matches PHP logic)
         let repliedToWamid = null;
+        let isForwarded = false;  // Matches PHP at line 3253
+        
         if (message.reaction) {
             messageBody = message.reaction.emoji;
             repliedToWamid = message.reaction.message_id;
         } else if (message.context?.id) {
             // Regular reply
             repliedToWamid = message.context.id;
+            // Check if forwarded (matches PHP at line 3253)
+            isForwarded = message.context.forwarded || false;
         }
 
-        // Find replied message if exists
-        let repliedToMessageId = null;
+        // Find replied message UID if exists (column is replied_to_whatsapp_message_logs__uid)
+        let repliedToMessageUid = null;
         if (repliedToWamid) {
             const [repliedRows] = await this.db.execute(
-                'SELECT _id FROM whatsapp_message_logs WHERE wamid = ? AND vendors__id = ?',
+                'SELECT _uid FROM whatsapp_message_logs WHERE wamid = ? AND vendors__id = ?',
                 [repliedToWamid, vendorId]
             );
             if (repliedRows.length > 0) {
-                repliedToMessageId = repliedRows[0]._id;
+                repliedToMessageUid = repliedRows[0]._uid;
             }
         }
 
         // Store message in database (matches PHP schema)
         const insertData = {
+            _uid: this.generateUid(),  // Generate unique ID for this record
             wamid,
             vendors__id: vendorId,
             contacts__id: contactId,
-            phone_number_id: phoneNumberId,
+            wab_phone_number_id: phoneNumberId,  // Note: column name is wab_phone_number_id in DB
             message: messageBody,
-            message_type: messageType,
             is_incoming_message: 1,
-            replied_to_whatsapp_message_logs__id: repliedToMessageId,
+            is_forwarded: isForwarded ? 1 : 0,  // Add forwarded flag (matches PHP at line 3311)
+            replied_to_whatsapp_message_logs__uid: repliedToMessageUid,  // Note: column stores UID not ID
             __data: JSON.stringify({
+                message_type: messageType,  // Store message_type in __data JSON
                 media: mediaData,
                 other: otherMessageData,
                 timestamp: timestamp
@@ -228,26 +384,37 @@ class WebhookService {
             updated_at: new Date()
         };
 
+        console.log('[WEBHOOK SERVICE] Inserting message into DB:', {
+            _uid: insertData._uid,
+            wamid: insertData.wamid,
+            contactId: insertData.contacts__id,
+            messageType: messageType,
+            isForwarded: insertData.is_forwarded
+        });
+
         await this.db.execute(
             `INSERT INTO whatsapp_message_logs 
-             (wamid, vendors__id, contacts__id, phone_number_id, message, 
-              message_type, is_incoming_message, replied_to_whatsapp_message_logs__id,
+             (_uid, wamid, vendors__id, contacts__id, wab_phone_number_id, message, 
+              is_incoming_message, is_forwarded, replied_to_whatsapp_message_logs__uid,
               __data, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
+                insertData._uid,
                 insertData.wamid,
                 insertData.vendors__id,
                 insertData.contacts__id,
-                insertData.phone_number_id,
+                insertData.wab_phone_number_id,
                 insertData.message,
-                insertData.message_type,
                 insertData.is_incoming_message,
-                insertData.replied_to_whatsapp_message_logs__id,
+                insertData.is_forwarded,
+                insertData.replied_to_whatsapp_message_logs__uid,
                 insertData.__data,
                 insertData.created_at,
                 insertData.updated_at
             ]
         );
+        
+        console.log('[WEBHOOK SERVICE] ✓ Message inserted successfully');
 
         // Process bot reply only for text-based messages (matches PHP logic)
         if (messageBody && ['text', 'interactive', 'button'].includes(messageType)) {
