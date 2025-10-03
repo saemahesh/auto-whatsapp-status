@@ -1,83 +1,136 @@
 const crypto = require('crypto');
 const logger = require('./logger');
 
-function getAppKeyBuffer() {
-    const rawKey = process.env.APP_KEY;
-    if (!rawKey) {
-        throw new Error('APP_KEY environment variable is not set');
+/**
+ * Laravel-compatible encryption/decryption utility
+ * Handles decryption of Laravel encrypted values using AES-256-CBC cipher
+ */
+class LaravelCrypto {
+    constructor() {
+        this.appKey = null;
+        this.cipher = 'AES-256-CBC';
     }
 
-    if (rawKey.startsWith('base64:')) {
-        return Buffer.from(rawKey.slice(7), 'base64');
-    }
-
-    return Buffer.from(rawKey, 'utf8');
-}
-
-function isLaravelPayload(value) {
-    if (typeof value !== 'string') {
-        return false;
-    }
-
-    try {
-        const decoded = Buffer.from(value, 'base64').toString('utf8');
-        const payload = JSON.parse(decoded);
-        return payload && payload.iv && payload.value && payload.mac;
-    } catch (error) {
-        return false;
-    }
-}
-
-function decryptLaravelValue(value, context = {}) {
-    if (!value) {
-        return value;
-    }
-
-    if (!isLaravelPayload(value)) {
-        return value;
-    }
-
-    try {
-        const key = getAppKeyBuffer();
-        if (key.length !== 32) {
-            throw new Error('APP_KEY must be 32 bytes for AES-256-CBC');
+    /**
+     * Initialize with Laravel APP_KEY
+     * @param {string} appKey - Laravel APP_KEY from .env (base64:xxx format)
+     */
+    initialize(appKey) {
+        if (!appKey) {
+            throw new Error('APP_KEY is required for Laravel decryption');
         }
 
-        const decoded = Buffer.from(value, 'base64').toString('utf8');
-        const payload = JSON.parse(decoded);
+        // Remove 'base64:' prefix if present
+        if (appKey.startsWith('base64:')) {
+            this.appKey = Buffer.from(appKey.substring(7), 'base64');
+        } else {
+            this.appKey = Buffer.from(appKey, 'utf8');
+        }
+    }
 
-        const iv = Buffer.from(payload.iv, 'base64');
-        const cipherText = Buffer.from(payload.value, 'base64');
-        const mac = payload.mac;
+    /**
+     * Check if crypto is initialized
+     * @returns {boolean}
+     */
+    isInitialized() {
+        return this.appKey !== null;
+    }
 
-        if (iv.length !== 16) {
-            throw new Error('Invalid IV length in payload');
+    /**
+     * Decrypt Laravel encrypted value
+     * Laravel format: {"iv":"xxx","value":"xxx","mac":"xxx","tag":"xxx"}
+     * @param {string} encryptedValue - JSON string with Laravel encryption format
+     * @returns {string} - Decrypted value
+     */
+    decrypt(encryptedValue) {
+        if (!this.isInitialized()) {
+            throw new Error('LaravelCrypto not initialized. Call initialize() with APP_KEY first.');
         }
 
-        const hmac = crypto
-            .createHmac('sha256', key)
-            .update(Buffer.concat([iv, Buffer.from(payload.value, 'utf8')]))
+        try {
+            // Parse the Laravel encrypted format
+            const payload = JSON.parse(encryptedValue);
+
+            if (!payload.iv || !payload.value || !payload.mac) {
+                throw new Error('Invalid Laravel encrypted payload format');
+            }
+
+            // Verify MAC (Message Authentication Code)
+            const mac = this.hash(payload.iv, payload.value);
+            if (mac !== payload.mac) {
+                throw new Error('MAC verification failed - data may be corrupted');
+            }
+
+            // Decode from base64
+            const iv = Buffer.from(payload.iv, 'base64');
+            const value = Buffer.from(payload.value, 'base64');
+
+            // Create decipher
+            const decipher = crypto.createDecipheriv('aes-256-cbc', this.appKey, iv);
+            
+            // Decrypt
+            let decrypted = decipher.update(value);
+            decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+            return decrypted.toString('utf8');
+        } catch (error) {
+            logger.warn('Failed to decrypt Laravel value, returning raw string', {
+                error: error.message
+            });
+            // Return original value if decryption fails
+            return encryptedValue;
+        }
+    }
+
+    /**
+     * Calculate HMAC hash for MAC verification
+     * @param {string} iv - Initialization vector
+     * @param {string} value - Encrypted value
+     * @returns {string} - HMAC hash
+     */
+    hash(iv, value) {
+        const payload = `${iv}${value}`;
+        return crypto
+            .createHmac('sha256', this.appKey)
+            .update(payload)
             .digest('hex');
+    }
 
-        if (!crypto.timingSafeEqual(Buffer.from(hmac, 'hex'), Buffer.from(mac, 'hex'))) {
-            throw new Error('Payload MAC is invalid');
+    /**
+     * Check if a value is Laravel encrypted format
+     * @param {string} value 
+     * @returns {boolean}
+     */
+    isEncrypted(value) {
+        if (typeof value !== 'string') {
+            return false;
         }
 
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-        let decrypted = decipher.update(cipherText, undefined, 'utf8');
-        decrypted += decipher.final('utf8');
+        try {
+            const parsed = JSON.parse(value);
+            return !!(parsed.iv && parsed.value && parsed.mac);
+        } catch {
+            return false;
+        }
+    }
 
-        return decrypted;
-    } catch (error) {
-        logger.warn('Failed to decrypt Laravel value, returning raw string', {
-            ...context,
-            error: error.message,
-        });
+    /**
+     * Decrypt value if it's encrypted, otherwise return as-is
+     * @param {string} value 
+     * @returns {string}
+     */
+    decryptIfNeeded(value) {
+        if (!value) {
+            return value;
+        }
+
+        if (this.isEncrypted(value)) {
+            return this.decrypt(value);
+        }
+
         return value;
     }
 }
 
-module.exports = {
-    decryptLaravelValue,
-    isLaravelPayload,
-};
+// Export singleton instance
+module.exports = new LaravelCrypto();
