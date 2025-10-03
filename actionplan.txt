@@ -1,98 +1,132 @@
 ============================================
-ITERATION 1 (FRESH START): DEBUGGING WEBHOOK ISSUES
+ITERATION 2: PHP WEBHOOK FORWARDING FIX
 ============================================
 
-## Current Issue from issue-details.txt:
-- Webhooks are not working (no console logs appearing)
-- 4 PM2 processes running instead of 1
-- Chatbot not responding to incoming messages
+## New Issue from Feedback:
+"still i can't see any webhook logs when i do pm2 logs whatsjet-nodejs
+is php service forwaring the webhook to nodejs service properly?"
 
-## Root Causes Identified:
+## Root Cause Identified:
+PHP webhook forwarding was configured incorrectly:
+1. **Wrong Port**: Using port 3000, but Node.js runs on port 3006
+2. **No Logging**: No way to debug if PHP is forwarding correctly
 
-### 1. PM2 Configuration Issue (FIXED):
-**Problem:** ecosystem.config.js had 3 separate apps:
-  - whatsjet-nodejs (2 cluster instances)
-  - whatsjet-webhook-worker (1 instance)
-  - whatsjet-campaign-worker (1 instance)
-  Total = 4 processes
+## Fixes Applied:
 
-**Fix Applied:** Changed ecosystem.config.js to run only 1 fork process
-  - Single process handles Express server + workers
-  - Removed separate worker processes
-  - Changed from cluster mode to fork mode
+### 1. Fixed Node.js Service URL in PHP Config
+**File:** `Source/config/services.php`
+**Change:** 
+- Old: `'url' => env('NODEJS_SERVICE_URL', 'http://localhost:3000')`
+- New: `'url' => env('NODEJS_SERVICE_URL', 'http://localhost:3006')`
+- Also ensured: `'enabled' => env('NODEJS_SERVICE_ENABLED', true)`
 
-### 2. Webhook Route Issue (FIXED):
-**Problem:** webhook.js was trying to call webhookService.processWebhook()
-  but webhookService was required as a class, not instantiated
+### 2. Added Comprehensive Logging to PHP Webhook Route
+**File:** `Source/routes/web.php`
+**Added logging for:**
+- Every webhook request received
+- Node.js enabled/disabled status
+- GET requests (verification)
+- POST requests (webhook data)
+- Success/failure of forwarding
+- Fallback to PHP processing
 
-**Fix Applied:** 
-  - Changed to use BullMQ queue pattern
-  - Webhook route now adds jobs to queue
-  - Worker processes the jobs asynchronously
-  - Properly separates HTTP response from processing
+**Log entries include:**
+- vendorUid
+- Request method
+- Node.js URL being used
+- Payload size
+- Response status
+- Error messages if any
 
-### 3. Missing Console Logs (FIXED):
-**Problem:** No debug logging to troubleshoot webhook flow
-
-**Fix Applied - Added comprehensive logging to:**
-  - nodeapp/src/index.js - Server startup logs
-  - nodeapp/src/routes/webhook.js - GET/POST webhook logs
-  - nodeapp/src/services/webhook-service.js - Processing logs
-  - nodeapp/src/workers/webhook-worker.js - Worker job logs
-  - nodeapp/src/workers/campaign-worker.js - Campaign job logs
+### 3. Created Deployment Guide
+**File:** `DEPLOYMENT-INSTRUCTIONS.md`
+**Contains:**
+- Step-by-step deployment instructions
+- How to verify each component
+- Expected log output for debugging
+- Troubleshooting guide for common issues
 
 ## Files Modified in This Iteration:
 
-1. nodeapp/ecosystem.config.js
-   - Reduced to 1 app definition (fork mode, 1 instance)
-   - Removed separate worker app definitions
+1. `Source/config/services.php`
+   - Changed default port from 3000 to 3006
 
-2. nodeapp/src/index.js
-   - Added detailed startup logging
-   - Added route registration logging
-   - Added worker initialization logging
+2. `Source/routes/web.php`
+   - Updated default Node.js URL to use 3006
+   - Added comprehensive \Log::info() statements
+   - Added error context in catch blocks
 
-3. nodeapp/src/routes/webhook.js
-   - Added comprehensive logging to GET endpoint
-   - Added comprehensive logging to POST endpoint
-   - Fixed webhook processing to use queue
-   - Added proper db/redis/Queue imports
+3. `DEPLOYMENT-INSTRUCTIONS.md` (NEW)
+   - Complete deployment guide
+   - Testing procedures
+   - Troubleshooting steps
 
-4. nodeapp/src/services/webhook-service.js
-   - Added console logs at every major step
-   - Added logging for vendor lookup
-   - Added logging for message routing
-   - Added logging for status updates
+## How It Works Now:
 
-5. nodeapp/src/workers/webhook-worker.js
-   - Added job start/end logging
-   - Added payload logging
-   - Added error logging with stack traces
+### Webhook Flow:
+1. WhatsApp sends webhook to: `https://yourdomain.com/whatsapp-webhook/{vendorUid}`
+2. PHP route receives it and logs: `[PHP WEBHOOK] Received webhook request`
+3. PHP checks if Node.js is enabled (should be true)
+4. For GET (verification): PHP forwards to Node.js and returns response
+5. For POST (webhook): PHP forwards to `http://localhost:3006/webhook/{vendorUid}` and returns 200
+6. Node.js receives it and logs: `[WEBHOOK POST] Received webhook data`
+7. Node.js queues it for processing by worker
+8. Worker processes and triggers bot reply if needed
 
-6. nodeapp/src/workers/campaign-worker.js
-   - Added job processing logs
-   - Added API call result logs
-   - Added retry logic logs
+## User Action Required:
 
-## Expected Behavior After This Fix:
+1. **Add to .env file (if not already there):**
+   ```
+   NODEJS_SERVICE_URL=http://localhost:3006
+   NODEJS_SERVICE_ENABLED=true
+   ```
 
-When a webhook is received from WhatsApp:
-1. [WEBHOOK POST] logs will appear showing the request
-2. Job will be queued in BullMQ
-3. [WEBHOOK WORKER] logs will show job processing
-4. [WEBHOOK SERVICE] logs will show vendor lookup and routing
-5. Bot response will be sent if chatbot matches keyword
+2. **Clear Laravel cache:**
+   ```bash
+   cd Source
+   php artisan config:clear
+   php artisan cache:clear
+   ```
 
-## Next Steps:
-- User needs to restart PM2 process
-- Test by sending message to WhatsApp number
-- Check console logs to debug any remaining issues
-- Read issue-details.txt for feedback
+3. **Restart PM2:**
+   ```bash
+   pm2 restart whatsjet-nodejs
+   ```
 
-Iteration count: 1/148
+4. **Test webhook:**
+   - Send message to WhatsApp number
+   - Check PHP logs: `tail -f Source/storage/logs/laravel.log`
+   - Check Node.js logs: `pm2 logs whatsjet-nodejs`
+
+## Expected Log Output:
+
+### PHP Log (Laravel):
+```
+[PHP WEBHOOK] Received webhook request vendorUid=abc123 method=POST
+[PHP WEBHOOK] POST request - forwarding to Node.js asynchronously
+[PHP WEBHOOK] Successfully forwarded to Node.js
+```
+
+### Node.js Log (PM2):
+```
+[WEBHOOK POST] Received webhook data
+[WEBHOOK POST] vendorUid: abc123
+[WEBHOOK POST] ✓ Webhook queued with job ID: 1
+[WEBHOOK WORKER] Processing job: 1
+[WEBHOOK SERVICE] ✓ Vendor ID found: 123
+```
+
+Iteration count: 2/148
 Status: Waiting for testing feedback
 
 ============================================
+
+PREVIOUS ITERATIONS SUMMARY:
+============================================
+Iteration 1: Fixed PM2 configuration (4 processes → 1), added Node.js logging
+Iteration 2: Fixed PHP webhook forwarding port and added PHP logging
+============================================
+
 
 1. ✓ sendTemplateMessage - Campaign messages
 2. ✓ sendTextMessage - Bot text replies  

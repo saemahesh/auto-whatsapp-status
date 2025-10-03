@@ -1350,32 +1350,58 @@ Route::get('/custom-styles.css', [
 // whatsapp webhook - WITH NODE.JS INTEGRATION AND PHP FALLBACK
 // DO NOT CHANGE THE PATH as it described in CSRF protection
 Route::any('whatsapp-webhook/{vendorUid}', function ($vendorUid, Request $request) {
-    $nodeJsUrl = config('services.nodejs.url', 'http://localhost:3000');
-    $nodeJsEnabled = config('services.nodejs.enabled', false);
+    $nodeJsUrl = config('services.nodejs.url', 'http://localhost:3006');
+    $nodeJsEnabled = config('services.nodejs.enabled', true);
+    
+    \Log::info('[PHP WEBHOOK] Received webhook request', [
+        'vendorUid' => $vendorUid,
+        'method' => $request->method(),
+        'nodeJsUrl' => $nodeJsUrl,
+        'nodeJsEnabled' => $nodeJsEnabled,
+        'query' => $request->query(),
+        'has_body' => !empty($request->all())
+    ]);
     
     // If Node.js is disabled, use original PHP processing
     if (!$nodeJsEnabled) {
+        \Log::info('[PHP WEBHOOK] Node.js disabled, using PHP processing');
         return app(WhatsAppServiceController::class)->webhook($request, $vendorUid);
     }
     
     // Handle GET request (webhook verification from WhatsApp)
     if ($request->isMethod('GET')) {
+        \Log::info('[PHP WEBHOOK] GET request - forwarding to Node.js for verification');
         try {
             $response = Http::timeout(5)->get("{$nodeJsUrl}/webhook/{$vendorUid}", $request->all());
+            \Log::info('[PHP WEBHOOK] Node.js verification response', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
             return response($response->body(), $response->status());
         } catch (\Exception $e) {
-            \Log::error('Webhook verification via Node.js failed, falling back to PHP:', ['error' => $e->getMessage()]);
+            \Log::error('[PHP WEBHOOK] Verification via Node.js failed, falling back to PHP', [
+                'error' => $e->getMessage(),
+                'url' => "{$nodeJsUrl}/webhook/{$vendorUid}"
+            ]);
             // Fallback to PHP processing
             return app(WhatsAppServiceController::class)->webhook($request, $vendorUid);
         }
     }
     
     // Handle POST request (webhook from WhatsApp)
+    \Log::info('[PHP WEBHOOK] POST request - forwarding to Node.js asynchronously', [
+        'payload_size' => strlen(json_encode($request->all()))
+    ]);
+    
     // Return 200 immediately and forward to Node.js asynchronously
     try {
         Http::async()->timeout(5)->post("{$nodeJsUrl}/webhook/{$vendorUid}", $request->all());
+        \Log::info('[PHP WEBHOOK] Successfully forwarded to Node.js');
     } catch (\Exception $e) {
-        \Log::warning('Webhook forwarding to Node.js failed, falling back to PHP:', ['error' => $e->getMessage()]);
+        \Log::warning('[PHP WEBHOOK] Forwarding to Node.js failed, falling back to PHP', [
+            'error' => $e->getMessage(),
+            'url' => "{$nodeJsUrl}/webhook/{$vendorUid}"
+        ]);
         // Fallback to PHP processing asynchronously
         dispatch(function() use ($request, $vendorUid) {
             app(WhatsAppServiceController::class)->webhook($request, $vendorUid);

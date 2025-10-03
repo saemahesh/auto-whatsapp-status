@@ -55,3 +55,6 @@ in all nodejs files, put console logs to see where the issue is to debug issues
 and also check why the webhook is not working properly
 and also why 4 pm2 processes are running for nodejs service,
 keep it simple and only 1 process should run all the services / nodejs cron jobs
+
+still i can't see any webhook logs when i do pm2 logs whatsjet-nodejs
+is php service forwaring the webhook to nodejs service properly?

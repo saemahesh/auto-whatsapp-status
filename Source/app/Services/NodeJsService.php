@@ -12,7 +12,7 @@ class NodeJsService
 
     public function __construct()
     {
-        $this->baseUrl = config('services.nodejs.url', 'http://localhost:3000');
+        $this->baseUrl = config('services.nodejs.url', 'http://localhost:3006');
         $this->enabled = config('services.nodejs.enabled', true);
     }
 
