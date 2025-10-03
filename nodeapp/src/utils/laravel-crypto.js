@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const logger = require('./logger');
+const { phpUnserialize, isPhpSerialized } = require('./php-unserialize');
 
 /**
  * Laravel-compatible encryption/decryption utility
@@ -100,8 +101,23 @@ class LaravelCrypto {
             let decrypted = decipher.update(value);
             decrypted = Buffer.concat([decrypted, decipher.final()]);
 
-            const decryptedValue = decrypted.toString('utf8');
-            logger.debug('✓ Successfully decrypted Laravel value');
+            let decryptedValue = decrypted.toString('utf8');
+            logger.debug('✓ Successfully decrypted Laravel value', {
+                decryptedPreview: decryptedValue.substring(0, 30) + '...'
+            });
+
+            // Laravel may serialize values before encryption
+            // Check if decrypted value is PHP serialized and unserialize it
+            if (isPhpSerialized(decryptedValue)) {
+                logger.debug('Decrypted value is PHP serialized, unserializing...');
+                const unserialized = phpUnserialize(decryptedValue);
+                logger.debug('✓ Successfully unserialized PHP value', {
+                    originalPreview: decryptedValue.substring(0, 30) + '...',
+                    unserializedPreview: typeof unserialized === 'string' ? unserialized.substring(0, 30) + '...' : unserialized
+                });
+                return unserialized;
+            }
+
             return decryptedValue;
         } catch (error) {
             logger.error('Failed to decrypt Laravel value', {
