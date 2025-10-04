@@ -6,55 +6,61 @@ console.log('[WEBHOOK SERVICE] WebhookService module loaded');
 
 class WebhookService {
     constructor(db, redis) {
-        console.log('[WEBHOOK SERVICE] WebhookService instance created');
         this.db = db;
         this.redis = redis;
         this.botService = new BotService(db, redis);
+        this.timings = {}; // Track performance
     }
 
     async processWebhook(vendorUid, payload) {
-        console.log('[WEBHOOK SERVICE] processWebhook called');
-        console.log('[WEBHOOK SERVICE] vendorUid:', vendorUid);
-        // console.log('[WEBHOOK SERVICE] payload:', JSON.stringify(payload, null, 2));
+        this.timings = {}; // Reset timings
+        const t0 = Date.now();
         
         // Get vendor ID from UID
-        console.log('[WEBHOOK SERVICE] Getting vendor ID from UID...');
+        const t1 = Date.now();
         const vendorId = await this.getVendorIdFromUid(vendorUid);
+        this.timings.vendorLookup = Date.now() - t1;
+        
         if (!vendorId) {
-            console.error('[WEBHOOK SERVICE] ✗ Vendor not found:', vendorUid);
             throw new Error(`Vendor not found: ${vendorUid}`);
         }
-        console.log('[WEBHOOK SERVICE] ✓ Vendor ID found:', vendorId);
 
-        // Check if vendor has active plan (matches PHP logic at line 3058-3062)
-        // Note: We log warning but don't block webhook processing to avoid webhook delivery failures
+        // Check if vendor has active plan
+        const t2 = Date.now();
         const hasActivePlan = await this.checkVendorActivePlan(vendorId);
+        this.timings.planCheck = Date.now() - t2;
+        
         if (!hasActivePlan) {
-            logger.warn(`Vendor ${vendorId} has no active plan, but processing webhook anyway`);
+            logger.warn(`Vendor ${vendorId} has no active plan`);
         }
 
         const entry = payload.entry?.[0];
         const changes = entry?.changes?.[0];
         const field = changes?.field;
-        
-        console.log('[WEBHOOK SERVICE] Webhook field:', field);
 
         // Route to appropriate handler
+        const t3 = Date.now();
+        let result;
         switch (field) {
             case 'messages':
-                console.log('[WEBHOOK SERVICE] Routing to handleMessageWebhook...');
-                return await this.handleMessageWebhook(vendorId, changes);
+                result = await this.handleMessageWebhook(vendorId, changes);
+                break;
             case 'message_template_status_update':
-                console.log('[WEBHOOK SERVICE] Routing to handleTemplateStatusUpdate...');
-                return await this.handleTemplateStatusUpdate(vendorId, changes);
+                result = await this.handleTemplateStatusUpdate(vendorId, changes);
+                break;
             case 'account_update':
-                console.log('[WEBHOOK SERVICE] Routing to handleAccountUpdate...');
-                return await this.handleAccountUpdate(vendorId, changes);
+                result = await this.handleAccountUpdate(vendorId, changes);
+                break;
             default:
-                console.warn('[WEBHOOK SERVICE] ✗ Unknown webhook field:', field);
                 logger.warn(`Unknown webhook field: ${field}`);
-                return { processed: false };
+                result = { processed: false, reason: 'unknown field' };
         }
+        this.timings.handler = Date.now() - t3;
+        this.timings.total = Date.now() - t0;
+        
+        // Add timings to result
+        result.timings = this.timings;
+        return result;
     }
 
     /**
@@ -73,43 +79,40 @@ class WebhookService {
     }
 
     async handleMessageWebhook(vendorId, changes) {
-        console.log('[WEBHOOK SERVICE] handleMessageWebhook called');
         const value = changes.value;
         const phoneNumberId = value.metadata?.phone_number_id;
-        console.log('[WEBHOOK SERVICE] phoneNumberId:', phoneNumberId);
         
         // Handle message statuses (sent, delivered, read)
         if (value.statuses) {
-            console.log('[WEBHOOK SERVICE] Processing message status update...');
-            return await this.handleMessageStatus(vendorId, phoneNumberId, value.statuses[0]);
+            const t1 = Date.now();
+            const result = await this.handleMessageStatus(vendorId, phoneNumberId, value.statuses[0]);
+            this.timings.statusUpdate = Date.now() - t1;
+            return result;
         }
         
         // Handle incoming messages
         if (value.messages) {
-            console.log('[WEBHOOK SERVICE] Processing incoming message...');
-            return await this.handleIncomingMessage(vendorId, phoneNumberId, value);
+            const t1 = Date.now();
+            const result = await this.handleIncomingMessage(vendorId, phoneNumberId, value);
+            this.timings.incomingMessage = Date.now() - t1;
+            return result;
         }
 
-        console.log('[WEBHOOK SERVICE] No status or message found in webhook');
         return { processed: false };
     }
 
     async handleMessageStatus(vendorId, phoneNumberId, status) {
-        console.log('[WEBHOOK SERVICE] handleMessageStatus called');
         const wamid = status.id;
         const messageStatus = status.status;  // sent, delivered, read, failed
         const timestamp = status.timestamp;
         const waId = status.recipient_id;
         const errors = status.errors || [];  // WhatsApp API errors
-        
-        console.log('[WEBHOOK SERVICE] Message status details:', { wamid, messageStatus, waId, errors });
 
         // Check for healthy ecosystem error 131049 (matches PHP at line 3341-3368)
         // Marketing messages failed due to healthy ecosystem - we may reschedule it
         const hasHealthyEcosystemError = errors.some(err => err.code == 131049);
         
         if (hasHealthyEcosystemError && messageStatus === 'failed') {
-            console.log('[WEBHOOK SERVICE] Healthy ecosystem error detected (131049), checking requeue eligibility...');
             
             // Find the queue item for this message
             const [queueRows] = await this.db.execute(
@@ -170,7 +173,8 @@ class WebhookService {
             }
         }
 
-        // Update message log - store status in __data JSON (PHP schema doesn't have message_status column)
+        // Update message log
+        const t1 = Date.now();
         const [result] = await this.db.execute(
             `UPDATE whatsapp_message_logs 
              SET status = ?, 
@@ -182,27 +186,25 @@ class WebhookService {
              WHERE wamid = ? AND vendors__id = ?`,
             [messageStatus, messageStatus, timestamp, JSON.stringify(errors), wamid, vendorId]
         );
-        
-        console.log('[WEBHOOK SERVICE] Message status updated in DB, affected rows:', result.affectedRows);
+        this.timings.dbUpdate = Date.now() - t1;
 
         // If message was sent successfully, delete from queue
         if (messageStatus === 'sent' || messageStatus === 'delivered') {
+            const t2 = Date.now();
             await this.db.execute(
                 `DELETE FROM whatsapp_message_queue 
                  WHERE vendors__id = ? 
                  AND phone_with_country_code = ? 
-                 AND status IN (3, 4)`,  // processing or waiting
+                 AND status IN (3, 4)`,
                 [vendorId, waId]
             );
-            console.log('[WEBHOOK SERVICE] Message removed from queue');
+            this.timings.queueDelete = Date.now() - t2;
         }
 
-        logger.info(`Message status updated: ${wamid} -> ${messageStatus}`);
         return { processed: true, status: messageStatus };
     }
 
     async handleIncomingMessage(vendorId, phoneNumberId, value) {
-        console.log('[WEBHOOK SERVICE] handleIncomingMessage called');
         const message = value.messages[0];
         const contact = value.contacts[0];
         
@@ -210,39 +212,33 @@ class WebhookService {
         const wamid = message.id;
         const messageType = message.type;
         const timestamp = message.timestamp;
-        
-        console.log('[WEBHOOK SERVICE] Incoming message details:', { waId, wamid, messageType, timestamp });
 
-        // Skip welcome and deleted messages (matches PHP logic)
+        // Skip welcome and deleted messages
         if (messageType === 'request_welcome') {
-            console.log('[WEBHOOK SERVICE] Skipping welcome message');
             return { processed: false, reason: 'welcome_message' };
         }
-
-        // Check for deleted message error (matches PHP)
         if (message.errors && message.errors[0]?.code === 131051) {
-            console.log('[WEBHOOK SERVICE] Skipping deleted message');
             return { processed: false, reason: 'deleted_message' };
         }
 
         // Get or create contact
-        console.log('[WEBHOOK SERVICE] Getting or creating contact...');
+        const t1 = Date.now();
         let contactId = await this.getOrCreateContact(vendorId, waId, contact);
-        console.log('[WEBHOOK SERVICE] Contact ID:', contactId);
+        this.timings.contactLookup = Date.now() - t1;
 
-        // Prevent duplicate message creation (matches PHP hasLogEntryOfMessage check)
+        // Prevent duplicate message creation
+        const t2 = Date.now();
         const [existingMsg] = await this.db.execute(
             'SELECT _id FROM whatsapp_message_logs WHERE wamid = ? AND vendors__id = ?',
             [wamid, vendorId]
         );
+        this.timings.duplicateCheck = Date.now() - t2;
 
         if (existingMsg.length > 0) {
-            console.log('[WEBHOOK SERVICE] Duplicate message skipped:', wamid);
-            logger.info(`Duplicate message skipped: ${wamid}`);
             return { processed: false, reason: 'duplicate_message' };
         }
 
-        // Extract message body and media data based on type (matches PHP logic)
+        // Extract message body and media data based on type
         let messageBody = '';
         let mediaData = null;
         let otherMessageData = null;
@@ -259,10 +255,10 @@ class WebhookService {
             messageBody = message.button?.text;
         }
         else if (['image', 'video', 'audio', 'document', 'sticker'].includes(messageType)) {
-            // Download and store media file (matches PHP at line 3244-3254)
             const mediaId = message[messageType]?.id;
             const caption = message[messageType]?.caption;
             
+            const t3 = Date.now();
             try {
                 // Get vendor UID for storage path
                 const [vendorRows] = await this.db.execute(
@@ -381,9 +377,9 @@ class WebhookService {
             wamid: insertData.wamid,
             contactId: insertData.contacts__id,
             messageType: messageType,
-            isForwarded: insertData.is_forwarded
         });
 
+        const t4 = Date.now();
         await this.db.execute(
             `INSERT INTO whatsapp_message_logs 
              (_uid, wamid, vendors__id, contacts__id, wab_phone_number_id, message, 
@@ -405,20 +401,27 @@ class WebhookService {
                 insertData.updated_at
             ]
         );
-        
-        console.log('[WEBHOOK SERVICE] ✓ Message inserted successfully');
+        this.timings.messageInsert = Date.now() - t4;
 
-        // Process bot reply only for text-based messages (matches PHP logic)
+        // Process bot reply only for text-based messages
         if (messageBody && ['text', 'interactive', 'button'].includes(messageType)) {
+            const t5 = Date.now();
             await this.botService.checkAndReply(vendorId, contactId, waId, messageBody, { phoneNumberId });
+            this.timings.botCheck = Date.now() - t5;
+            
+            if (this.timings.botCheck > 1000) {
+                logger.warn(`Slow bot check: ${this.timings.botCheck}ms for message: "${messageBody}"`);
+            }
         }
 
-        logger.info(`Incoming message stored: ${wamid} from ${waId}, type: ${messageType}`);
+        logger.info(`Message ${messageType} from ${waId} processed in ${this.timings.total || 0}ms`, { 
+            timings: this.timings 
+        });
         return { processed: true, contactId: contactId, messageType: messageType };
     }
 
     async getOrCreateContact(vendorId, waId, contactData) {
-        // Try to find existing contact (matches PHP getVendorContactByWaId)
+        // Try to find existing contact
         const [rows] = await this.db.execute(
             'SELECT _id, _uid, first_name FROM contacts WHERE vendors__id = ? AND wa_id = ?',
             [vendorId, waId]

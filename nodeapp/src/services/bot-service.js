@@ -99,21 +99,29 @@ class BotService {
     }
 
     async checkAndReply(vendorId, contactId, waId, messageBody, options = {}) {
+        const startTime = Date.now();
+        const timings = {};
+        
         try {
             const { phoneNumberId } = options;
             
-            // Check if vendor has active plan (matches PHP logic at line 2655-2658)
+            // Check if vendor has active plan
+            const t1 = Date.now();
             const hasActivePlan = await this.checkVendorActivePlan(vendorId);
+            timings.planCheck = Date.now() - t1;
+            
             if (!hasActivePlan) {
                 logger.warn(`Vendor ${vendorId} has no active plan, skipping bot reply`);
                 return { matched: false, reason: 'no_active_plan' };
             }
 
             // Get contact's bot preferences
+            const t2 = Date.now();
             const [contactRows] = await this.db.execute(
-                'SELECT disable_reply_bot, disable_ai_bot, whatsapp_opt_out FROM contacts WHERE _id = ?',
+                'SELECT _id, disable_reply_bot, disable_ai_bot, whatsapp_opt_out FROM contacts WHERE _id = ?',
                 [contactId]
             );
+            timings.contactQuery = Date.now() - t2;
 
             if (contactRows.length === 0 || contactRows[0].disable_reply_bot) {
                 return { matched: false };
@@ -121,17 +129,24 @@ class BotService {
 
             const contact = contactRows[0];
 
-            // Check bot timing restrictions (matches PHP logic at line 2671-2673)
+            // Check bot timing restrictions
+            const t3 = Date.now();
             const isBotTimingsEnabled = await this.getVendorSetting(vendorId, 'enable_bot_timing_restrictions');
             const isBotTimingsInTime = await this.isInAllowedBotTiming(vendorId);
+            timings.timingCheck = Date.now() - t3;
 
             // Get active bot replies (cached)
+            const t4 = Date.now();
             const bots = await this.getActiveBots(vendorId);
+            timings.botsLoad = Date.now() - t4;
             
             // Check if it's first message for welcome bot
+            const t5 = Date.now();
             const isFirstMsg = await this.isFirstMessage(vendorId, contactId);
+            timings.firstMsgCheck = Date.now() - t5;
 
             // Try to match message with bot triggers
+            const t6 = Date.now();
             const matchedBot = await this.findMatchingBot(
                 messageBody.toLowerCase(), 
                 bots, 
@@ -140,14 +155,24 @@ class BotService {
                 isBotTimingsInTime,
                 contact
             );
+            timings.botMatching = Date.now() - t6;
 
             if (matchedBot) {
-                logger.info(`Bot matched: ${matchedBot._id} for message: ${messageBody}`);
+                const t7 = Date.now();
                 await this.sendBotReply(vendorId, contactId, waId, matchedBot, contact, phoneNumberId);
-                return { matched: true, botId: matchedBot._id };
+                timings.sendReply = Date.now() - t7;
+                timings.total = Date.now() - startTime;
+                
+                logger.info(`Bot ${matchedBot._id} matched and replied in ${timings.total}ms`, { timings });
+                return { matched: true, botId: matchedBot._id, timings };
             }
 
-            return { matched: false };
+            timings.total = Date.now() - startTime;
+            if (timings.total > 500) {
+                logger.warn(`Bot check slow (no match): ${timings.total}ms`, { timings });
+            }
+            
+            return { matched: false, timings };
         } catch (error) {
             logger.error('Bot check error:', error);
             return { matched: false, error: error.message };
@@ -243,14 +268,10 @@ class BotService {
         const cached = await this.redis.get(cacheKey);
         
         if (cached) {
-            const bots = JSON.parse(cached);
-            logger.debug(`Loaded ${bots.length} bots from cache for vendor ${vendorId}`);
-            return bots;
+            return JSON.parse(cached);
         }
 
-        // Fetch from database (matches PHP getRelatedOrWelcomeBots at line 154)
-        // IMPORTANT: Get ALL bots for vendor, filter by status later (like PHP does)
-        // PHP doesn't filter by status in query, it filters in the loop
+        // Fetch from database
         const [rows] = await this.db.execute(
             `SELECT br._id, br.reply_trigger, br.trigger_type, br.reply_text, br.__data, br.priority_index, br.status,
                     br.bot_flows__id, bf.status as bot_flow_status
@@ -260,8 +281,6 @@ class BotService {
              ORDER BY br.priority_index ASC`,
             [vendorId]
         );
-
-        logger.info(`Loaded ${rows.length} bot_replies from database for vendor ${vendorId} (including all statuses)`);
 
         const bots = rows.map(row => {
             let parsedData = {};
@@ -277,11 +296,7 @@ class BotService {
                         parsedData = rawData;
                     }
                 } catch (error) {
-                    logger.warn('Failed to parse bot __data JSON, using empty object', {
-                        vendorId,
-                        botId: row._id,
-                        error: error.message
-                    });
+                    logger.warn(`Failed to parse bot ${row._id} __data`, { vendorId });
                     parsedData = {};
                 }
             }
@@ -290,8 +305,6 @@ class BotService {
                 .split(',')
                 .map(t => t.trim().toLowerCase())
                 .filter(Boolean);
-
-            logger.debug(`Bot ${row._id}: trigger_type=${row.trigger_type}, triggers=[${triggers.join(', ')}], bot_flows__id=${row.bot_flows__id || 'null'}, bot_flow_status=${row.bot_flow_status || 'null'}`);
 
             return {
                 ...row,
@@ -305,70 +318,44 @@ class BotService {
         // Cache for 30 minutes
         await this.redis.setex(cacheKey, 1800, JSON.stringify(bots));
         
-        logger.info(`Cached ${bots.length} bots for vendor ${vendorId}`);
+        logger.info(`Loaded ${bots.length} bots for vendor ${vendorId}`);
         
         return bots;
     }
 
     async findMatchingBot(messageBody, bots, isFirstMessage, timingEnabled, timingInTime, contact) {
-        logger.info(`Finding bot match for message: "${messageBody}"`, {
-            botsCount: bots.length,
-            isFirstMessage,
-            timingEnabled,
-            timingInTime
-        });
-
         for (const bot of bots) {
-            logger.debug(`Checking bot ${bot._id}`, {
-                botId: bot._id,
-                triggerType: bot.trigger_type,
-                triggers: bot.triggers,
-                priorityIndex: bot.priority_index,
-                botFlowsId: bot.bot_flows__id,
-                botFlowStatus: bot.bot_flow_status
-            });
-
-            // Check bot flow status (matches PHP logic at line 2717-2721)
-            // If normal bot and it is inactive, skip
+            // Check bot flow status
             if (!bot.bot_flows__id && bot.status === 2) {
-                logger.debug(`Skipping bot ${bot._id} - normal bot is inactive (status=2)`);
-                continue;
+                continue; // Skip inactive normal bot
             }
-            // If bot flow inactive, skip
             if (bot.bot_flows__id && bot.bot_flow_status === 2) {
-                logger.debug(`Skipping bot ${bot._id} - bot flow is inactive (flow status=2)`);
-                continue;
+                continue; // Skip inactive bot flow
             }
 
-            // Check timing restrictions for this bot type (matches PHP logic at line 2688-2690)
+            // Check timing restrictions
             if (timingEnabled && !timingInTime) {
-                // Skip bots that have timing restrictions
-                // Note: PHP has enable_selected_other_bot_timing_restrictions - we simplify here
                 if (bot.trigger_type !== 'welcome') {
-                    logger.debug(`Skipping bot ${bot._id} due to timing restrictions`);
-                    continue;
+                    continue; // Skip non-welcome bots during restricted times
                 }
             }
 
-            // Handle welcome bot (matches PHP logic at line 2750-2753)
+            // Handle welcome bot
             if (bot.trigger_type === 'welcome') {
                 if (!isFirstMessage) {
-                    logger.debug(`Skipping welcome bot ${bot._id} - not first message`);
-                    continue; // Skip welcome bot if not first message
+                    continue;
                 }
-                logger.info(`Welcome bot ${bot._id} matched!`);
-                return bot; // Welcome bot matches on first message
+                logger.info(`Welcome bot ${bot._id} matched`);
+                return bot;
             }
 
-            // Handle special triggers (matches PHP logic at line 2754-2809)
+            // Handle special triggers
             for (const trigger of bot.triggers) {
-                logger.debug(`Testing trigger "${trigger}" (type: ${bot.trigger_type})`);
                 let matched = false;
 
-                // Special trigger: start_promotional (matches PHP line 2754-2764)
+                // Special trigger: start_promotional
                 if (bot.trigger_type === 'start_promotional') {
                     if (messageBody === trigger) {
-                        // Update contact to opt-in (remove whatsapp_opt_out)
                         if (contact.whatsapp_opt_out) {
                             await this.db.execute(
                                 'UPDATE contacts SET whatsapp_opt_out = NULL WHERE _id = ?',
@@ -436,15 +423,12 @@ class BotService {
                 }
 
                 if (matched) {
-                    logger.info(`✓ Bot ${bot._id} matched! Trigger: "${trigger}" (type: ${bot.trigger_type})`);
+                    logger.info(`Bot ${bot._id} matched: "${trigger}" (${bot.trigger_type})`);
                     return bot;
-                } else {
-                    logger.debug(`✗ No match for trigger "${trigger}" against message "${messageBody}"`);
                 }
             }
         }
 
-        logger.info(`No bot matched for message: "${messageBody}"`);
         return null;
     }
 
@@ -453,8 +437,9 @@ class BotService {
     }
 
     async sendBotReply(vendorId, contactId, waId, bot, contact, phoneNumberId) {
+        const timings = {};
         try {
-            // Get message data from __data field (matches PHP)
+            // Get message data from __data field
             const interactionMessageData = bot.__data?.interaction_message || null;
             const mediaMessageData = bot.__data?.media_message || null;
             const templateMessageData = bot.__data?.template_message || null;
@@ -463,7 +448,9 @@ class BotService {
             let messageType = 'text';
             let messageContent = bot.reply_text;
 
-            // Send interactive message if configured (matches PHP logic at line 2403)
+            const t1 = Date.now();
+            
+            // Send interactive message if configured
             if (interactionMessageData) {
                 messageType = 'interactive';
                 result = await whatsappApi.sendInteractiveMessage(
@@ -472,15 +459,15 @@ class BotService {
                     interactionMessageData
                 );
             } 
-            // Send media message if configured (matches PHP logic at line 2440)
+            // Send media message if configured
             else if (mediaMessageData) {
                 messageType = 'media';
-                const mediaType = mediaMessageData.header_type; // image, video, document, audio
+                const mediaType = mediaMessageData.header_type;
                 const fileUrl = mediaMessageData.media_link;
                 const fileName = mediaMessageData.file_name;
                 const caption = mediaMessageData.caption || '';
 
-                // Use media_id if available and not expired (matches PHP logic)
+                // Use media_id if available and not expired
                 let mediaLink = fileUrl;
                 if (mediaMessageData.media_id && 
                     mediaMessageData.media_id_expiry_at && 
@@ -516,16 +503,17 @@ class BotService {
                 messageContent = await this.replaceDynamicValues(bot.reply_text, contactId);
                 result = await whatsappApi.sendTextMessage(vendorId, waId, messageContent);
             }
+            
+            timings.apiCall = Date.now() - t1;
 
             if (result.success) {
-                // Log bot reply (matches PHP updateOrCreateWhatsAppMessageFromWebhook)
-                // bot_reply is stored in __data->options, not as separate column
+                const t2 = Date.now();
                 const messageLogData = {
                     options: {
                         bot_reply: true,
                         ai_bot_reply: false
                     },
-                    bot_replies__id: bot._id, // Store bot ID in __data for reference
+                    bot_replies__id: bot._id,
                     message_type: messageType,
                     initial_response: {
                         accepted: result.response || {}
@@ -543,12 +531,15 @@ class BotService {
                         vendorId, 
                         contactId, 
                         messageContent,
-                        phoneNumberId, // Add phone number ID like PHP does
+                        phoneNumberId,
                         JSON.stringify(messageLogData)
                     ]
                 );
-
-                logger.info(`Bot reply sent: ${result.wamid} (type: ${messageType})`);
+                
+                timings.dbInsert = Date.now() - t2;
+                timings.total = timings.apiCall + timings.dbInsert;
+                
+                logger.info(`Bot reply sent: ${result.wamid} (${messageType}) in ${timings.total}ms`, { timings });
             } else {
                 logger.error(`Bot reply failed for bot ${bot._id}:`, result.error);
             }

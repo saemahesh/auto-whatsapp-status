@@ -8,40 +8,47 @@ console.log('[WEBHOOK WORKER] Webhook worker module loaded');
 console.log('[WEBHOOK WORKER] Initializing BullMQ worker...');
 
 const webhookWorker = new Worker('whatsapp-webhooks', async (job) => {
-    console.log('========================================');
-    console.log('[WEBHOOK WORKER] Processing job:', job.id);
-    const { vendorUid, payload, receivedAt } = job.data;
-    console.log('[WEBHOOK WORKER] Job data:', { vendorUid, receivedAt });
-    // console.log('[WEBHOOK WORKER] Job payload:', JSON.stringify(payload, null, 2));
-    
-    logger.info(`Processing webhook ${job.id} for vendor ${vendorUid}`);
+    const startTime = Date.now();
+    const timings = {};
     
     try {
-        console.log('[WEBHOOK WORKER] Creating WebhookService instance...');
+        // Create service
+        const t1 = Date.now();
         const webhookService = new WebhookService(db, redis);
+        timings.serviceInit = Date.now() - t1;
         
-        console.log('[WEBHOOK WORKER] Calling webhookService.processWebhook...');
-        const result = await webhookService.processWebhook(vendorUid, payload);
+        // Process webhook
+        const t2 = Date.now();
+        const result = await webhookService.processWebhook(
+            job.data.vendorUid,
+            job.data.payload,
+            job.data.headers
+        );
+        timings.processing = Date.now() - t2;
+        timings.total = Date.now() - startTime;
         
-        const processingTime = Date.now() - receivedAt;
-        console.log('[WEBHOOK WORKER] ✓ Job completed in', processingTime, 'ms');
-        console.log('[WEBHOOK WORKER] Result:', JSON.stringify(result, null, 2));
-        logger.info(`Webhook ${job.id} processed in ${processingTime}ms`);
+        // Log summary based on webhook type
+        const webhookType = result.messageType || result.status || 'unknown';
+        if (timings.total > 1000) {
+            // Log slow webhooks (> 1s)
+            logger.warn(`SLOW webhook ${job.id} [${webhookType}] ${timings.total}ms`, { timings, result });
+        } else if (timings.total > 500) {
+            // Log medium webhooks (> 500ms)
+            logger.info(`Webhook ${job.id} [${webhookType}] ${timings.total}ms`, { timings });
+        }
+        // Fast webhooks (< 500ms) logged minimally
         
         return result;
     } catch (error) {
-        console.error('[WEBHOOK WORKER] ✗ Job failed:', error.message);
-        console.error('[WEBHOOK WORKER] Stack trace:', error.stack);
-        logger.error(`Webhook ${job.id} processing failed:`, error);
-        throw error;  // Will trigger retry
-    } finally {
-        console.log('========================================');
+        timings.total = Date.now() - startTime;
+        logger.error(`Webhook ${job.id} FAILED after ${timings.total}ms:`, error.message);
+        throw error;
     }
 }, {
     connection: redis,
-    concurrency: 50,  // Process 50 webhooks concurrently
+    concurrency: 50,  // Process up to 50 webhooks concurrently
     limiter: {
-        max: 100,     // Max 100 webhooks per second
+        max: 100,      // Max 100 webhooks per second
         duration: 1000
     }
 });
